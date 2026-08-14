@@ -26,6 +26,7 @@ import StudentReport from './pages/teacher/StudentReport'
 import StudentDetail from './pages/teacher/StudentDetail'
 import ClassAnalytics from './pages/teacher/ClassAnalytics'
 import UploadProgram from './pages/teacher/UploadProgram'
+import StudentsManagement from './pages/teacher/StudentsManagement'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -111,6 +112,7 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route path='dashboard' element={<TeacherDashboard user={user} />} />
+          <Route path='students' element={<StudentsManagement />} />
           <Route path='programs' element={<UploadProgram />} />
           <Route path='analytics' element={<ClassAnalytics />} />
           <Route path='profile' element={<TeacherProfile user={user} />} />

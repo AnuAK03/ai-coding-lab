@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../../services/firebase'
-import { Users, BookOpen, AlertTriangle, CheckCircle, BarChart3, Plus, History } from 'lucide-react'
+import { Users, AlertTriangle, BookOpen, CheckCircle, TrendingUp, TrendingDown, ArrowUpRight, AlertCircle, PauseCircle } from 'lucide-react'
 
 export default function TeacherDashboard({ user }) {
   const navigate = useNavigate()
@@ -11,37 +11,15 @@ export default function TeacherDashboard({ user }) {
   
   const [stats, setStats] = useState({
     totalStudents: 0,
-    totalSessions: 0,
-    flagged: 0,
-    reportsReady: 0,
+    belowAverage: 0,
+    activePrograms: 0,
+    completionRate: 0
   })
-  const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sessionsError, setSessionsError] = useState(null)
 
-  // Theme classes
-  const t = {
-    dark: {
-      bg: 'bg-[#0F0F10]',
-      text: 'text-[#EDEDED]',
-      textMuted: 'text-[#A1A1A3]',
-      textSubtle: 'text-[#737373]',
-      border: 'border-white/10',
-      borderSubtle: 'border-white/[0.06]',
-      cardBg: 'rgba(26, 26, 29, 0.7)',
-      hoverBg: 'hover:bg-white/[0.03]',
-    },
-    light: {
-      bg: 'bg-[#FAFAFA]',
-      text: 'text-[#171717]',
-      textMuted: 'text-[#737373]',
-      textSubtle: 'text-[#A3A3A3]',
-      border: 'border-[#E5E5E5]',
-      borderSubtle: 'border-[#F5F5F5]',
-      cardBg: 'rgba(255, 255, 255, 0.7)',
-      hoverBg: 'hover:bg-[#FAFAFA]',
-    }
-  }[theme]
+  // Get current date
+  const dateOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
+  const today = new Date().toLocaleDateString('en-US', dateOptions)
 
   useEffect(() => {
     async function loadStats() {
@@ -54,29 +32,23 @@ export default function TeacherDashboard({ user }) {
         const sessionSnap = await getDocs(collection(db, 'sessions'))
         const sessionsData = sessionSnap.docs.map(d => d.data())
 
+        // Calculate completion rate
+        const completedSessions = sessionsData.filter(s => s.status === 'complete').length
+        const completionRate = sessionsData.length > 0 
+          ? Math.round((completedSessions / sessionsData.length) * 100) 
+          : 0
+
+        // Calculate below average (students with quiz score < 70%)
+        const belowAverage = sessionsData.filter(s => 
+          s.status === 'complete' && (s.quizScore || 0) < 0.7
+        ).length
+
         setStats({
           totalStudents: studentSnap.size,
-          totalSessions: sessionsData.length,
-          flagged:       sessionsData.filter(s => s.flagged).length,
-          reportsReady:  sessionsData.filter(s => s.status === 'complete').length,
+          belowAverage: belowAverage,
+          activePrograms: 12,
+          completionRate: completionRate
         })
-
-        // Fetch recent sessions for the table
-        try {
-          const res = await fetch('/api/reports/sessions/recent')
-          
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-          }
-          
-          const data = await res.json()
-          setSessions(data.sessions || [])
-          setSessionsError(null)
-        } catch (e) {
-          console.error('Failed to load recent sessions:', e)
-          setSessionsError(e.message)
-          setSessions([])
-        }
 
       } catch (e) {
         console.error('Failed to load stats:', e)
@@ -89,178 +61,287 @@ export default function TeacherDashboard({ user }) {
 
   if (loading) {
     return (
-      <div className={`min-h-[calc(100vh-64px)] ${t.bg} flex items-center justify-center transition-colors duration-300`}>
-        <p className={t.textMuted}>Loading dashboard...</p>
+      <div className='min-h-screen flex items-center justify-center bg-[#FAFAF5] transition-colors duration-300'>
+        <p className='text-[#6B6B6B]'>Loading dashboard...</p>
       </div>
     )
   }
 
   return (
-    <div className={`min-h-[calc(100vh-64px)] ${t.bg} ${t.text} py-12 px-6 transition-colors duration-300`}>
-      <div className='max-w-6xl mx-auto'>
-        
-        {/* Header - Compact */}
-        <div className='flex items-start justify-between mb-8'>
-          <div>
-            <h1 className='text-2xl font-semibold mb-1'>Teacher Dashboard</h1>
-            <p className={`text-sm ${t.textMuted}`}>
-              Class overview and student performance insights
-            </p>
-          </div>
-          <div className='flex items-center gap-3'>
-            <button
-              onClick={() => navigate('/teacher/programs')}
-              className='flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg
-                         transition-all duration-200'
-              style={{
-                backgroundColor: theme === 'dark' ? 'rgba(129, 140, 248, 0.15)' : 'rgba(99, 102, 241, 0.12)',
-                color: theme === 'dark' ? '#A5B4FC' : '#6366F1'
-              }}
-            >
-              <Plus size={14} strokeWidth={2} /> Upload Program
-            </button>
-            <button
-              onClick={() => navigate('/teacher/analytics')}
-              className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg
-                         ${t.textMuted} transition-colors duration-200 border ${t.border}`}
-              style={{
-                backgroundColor: t.cardBg,
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)'
-              }}
-            >
-              <BarChart3 size={14} strokeWidth={2} /> View Analytics
-            </button>
-          </div>
+    <div className='min-h-screen bg-[#FAFAF5] transition-colors duration-300 py-6 px-8'>
+      <div className='max-w-[1180px] mx-auto space-y-6'>
+        {/* Welcome Header */}
+        <div className='mb-2'>
+          <h1 className='font-headline-lg text-headline-lg tracking-tight text-[#1F1F1F] mb-0.5 leading-tight'>Welcome back, Professor.</h1>
+          <p className='text-[13px] text-[#6B6B6B]'>{today}</p>
         </div>
 
-        {/* Stat Cards - Compact Notion-style */}
-        <div className='grid grid-cols-2 md:grid-cols-4 gap-4 mb-8'>
-          {[
-            { icon: Users,        label: 'Students',      value: stats.totalStudents, color: theme === 'dark' ? '#60A5FA' : '#3B82F6'   },
-            { icon: BookOpen,     label: 'Sessions',      value: stats.totalSessions, color: theme === 'dark' ? '#A78BFA' : '#8B5CF6' },
-            { icon: CheckCircle,  label: 'Reports Ready', value: stats.reportsReady,  color: theme === 'dark' ? '#34D399' : '#10B981'  },
-            { icon: AlertTriangle,label: 'Flagged',       value: stats.flagged,       color: theme === 'dark' ? '#FB923C' : '#F97316'    },
-          ].map(({ icon: Icon, label, value, color }) => (
-            <div 
-              key={label}
-              className={`rounded-lg border ${t.border} p-4 transition-all duration-200`}
-              style={{
-                backgroundColor: t.cardBg,
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: theme === 'dark' ? '0 1px 3px rgba(0, 0, 0, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.05)'
-              }}
-            >
-              <Icon size={16} style={{ color }} strokeWidth={2} className='mb-3' />
-              <p className='text-2xl font-semibold mb-0.5'>{value}</p>
-              <p className={`text-xs uppercase tracking-wide font-medium ${t.textSubtle}`}>
-                {label}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent Sessions Table */}
-        <div 
-          className={`rounded-lg border ${t.border} overflow-hidden`}
-          style={{
-            backgroundColor: t.cardBg,
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: theme === 'dark' ? '0 1px 3px rgba(0, 0, 0, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.05)'
-          }}
-        >
-          <div className={`px-6 py-4 border-b ${t.borderSubtle} flex items-center gap-2`}>
-            <History size={14} className={t.textMuted} />
-            <h2 className='font-medium text-sm'>Recent Sessions</h2>
-          </div>
-          
-          {sessionsError ? (
-            <div className='p-6'>
-              <div className='bg-red-500/10 border border-red-500/20 rounded-lg p-4'>
-                <p className='text-sm text-red-400 font-medium mb-1'>
-                  Failed to load sessions
-                </p>
-                <p className='text-xs text-red-300/60'>
-                  {sessionsError}
-                </p>
-                <p className='text-xs text-red-300/60 mt-2'>
-                  Check that the backend is running and accessible at /api/reports/sessions/recent
-                </p>
+        {/* KPI Cards Grid */}
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3'>
+          {/* Total Students */}
+          <div className='bg-white rounded-xl p-4 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+            <div className='flex items-start justify-between mb-3'>
+              <div className='w-9 h-9 bg-[#E8F5E9] rounded-lg flex items-center justify-center'>
+                <Users size={18} className='text-[#6B8E6F]' strokeWidth={2} />
+              </div>
+              <div className='flex items-center gap-0.5 text-[#6B8E6F] bg-[#E8F5E9] px-1.5 py-0.5 rounded-md text-[10px] font-semibold'>
+                <TrendingUp size={10} strokeWidth={2.5} />
+                +5%
               </div>
             </div>
-          ) : sessions.length === 0 ? (
-            <div className={`p-6 text-center ${t.textMuted} text-sm`}>
-              {stats.totalSessions > 0 
-                ? 'Sessions exist but could not be loaded. Check the error above.'
-                : 'No sessions yet. Reports appear here after students submit.'}
+            <p className='text-[11px] text-[#6B6B6B] mb-1 font-medium'>Total Students</p>
+            <p className='text-[32px] font-bold text-[#1F1F1F] leading-none'>{stats.totalStudents}</p>
+          </div>
+
+          {/* Below Average */}
+          <div className='bg-white rounded-xl p-4 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+            <div className='flex items-start justify-between mb-3'>
+              <div className='w-9 h-9 bg-[#FFEBEE] rounded-lg flex items-center justify-center'>
+                <AlertTriangle size={18} className='text-[#D32F2F]' strokeWidth={2} />
+              </div>
+              <div className='flex items-center gap-0.5 text-[#D32F2F] bg-[#FFEBEE] px-1.5 py-0.5 rounded-md text-[10px] font-semibold'>
+                <TrendingDown size={10} strokeWidth={2.5} />
+                -2
+              </div>
             </div>
-          ) : (
-            <div className='overflow-x-auto'>
-              <table className='w-full text-sm'>
-                <thead>
-                  <tr className={`border-b ${t.borderSubtle}`}>
-                    {['Student','Program','Status','Quiz Score','Hints','Runs','Violations','Flagged',''].map(h => (
-                      <th key={h} className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wide ${t.textSubtle}`}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className={`divide-y ${t.borderSubtle}`}>
-                  {sessions.map(s => (
-                    <tr key={s.sessionId} className={`transition-colors ${t.hoverBg}`}>
-                      <td className={`px-4 py-3 font-medium text-xs ${t.text}`}>
-                        {s.studentName || s.studentId?.slice(0,8) + '...'}
-                      </td>
-                      <td className={`px-4 py-3 text-xs ${t.textMuted}`}>
-                        {s.programTitle || s.programId?.slice(0,12) + '...'}
-                      </td>
-                      <td className='px-4 py-3'>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                                          ${s.status==='complete'
-                                            ? (theme === 'dark' ? 'bg-green-500/15 text-green-400' : 'bg-green-100 text-green-700')
-                                            : s.status==='processing'
-                                            ? (theme === 'dark' ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-100 text-blue-700')
-                                            : (theme === 'dark' ? 'bg-white/10 text-[#A1A1A3]' : 'bg-gray-100 text-gray-600')}`}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-3 ${t.text} font-medium text-sm`}>
-                        {Math.round((s.quizScore||0)*100)}%
-                      </td>
-                      <td className={`px-4 py-3 ${t.textMuted} text-sm`}>{s.hintsUsed}/3</td>
-                      <td className={`px-4 py-3 ${t.textMuted} text-sm`}>{s.runAttempts ?? '—'}</td>
-                      <td className={`px-4 py-3 ${s.violationCount > 0 ? 'text-orange-400' : t.textMuted} text-sm`}>
-                        {s.violationCount ?? 0}
-                      </td>
-                      <td className='px-4 py-3'>
-                        {s.flagged && (
-                          <span className={`text-xs font-medium ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>
-                            ⚠ Flagged
-                          </span>
-                        )}
-                      </td>
-                      <td className='px-4 py-3'>
-                        {s.status === 'complete' && (
-                          <button
-                            onClick={() => navigate(`/teacher/report/${s.sessionId}`)}
-                            className='text-xs font-medium transition-colors'
-                            style={{
-                              color: theme === 'dark' ? '#A5B4FC' : '#6366F1'
-                            }}
-                          >
-                            View Report
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <p className='text-[11px] text-[#6B6B6B] mb-1 font-medium'>Below Average</p>
+            <p className='text-[32px] font-bold text-[#1F1F1F] leading-none'>{stats.belowAverage}</p>
+          </div>
+
+          {/* Active Programs */}
+          <div className='bg-white rounded-xl p-4 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+            <div className='flex items-start justify-between mb-3'>
+              <div className='w-9 h-9 bg-[#E0F2F1] rounded-lg flex items-center justify-center'>
+                <BookOpen size={18} className='text-[#00796B]' strokeWidth={2} />
+              </div>
+              <div className='flex items-center gap-0.5 text-[#6B6B6B] bg-[#F5F5F5] px-1.5 py-0.5 rounded-md text-[10px] font-semibold'>
+                0
+              </div>
             </div>
-          )}
+            <p className='text-[11px] text-[#6B6B6B] mb-1 font-medium'>Active Programs</p>
+            <p className='text-[32px] font-bold text-[#1F1F1F] leading-none'>{stats.activePrograms}</p>
+          </div>
+
+          {/* Completion Rate */}
+          <div className='bg-white rounded-xl p-4 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+            <div className='flex items-start justify-between mb-3'>
+              <div className='w-9 h-9 bg-[#E8F5E9] rounded-lg flex items-center justify-center'>
+                <CheckCircle size={18} className='text-[#6B8E6F]' strokeWidth={2} />
+              </div>
+              <div className='flex items-center gap-0.5 text-[#6B8E6F] bg-[#E8F5E9] px-1.5 py-0.5 rounded-md text-[10px] font-semibold'>
+                <TrendingUp size={10} strokeWidth={2.5} />
+                +2%
+              </div>
+            </div>
+            <p className='text-[11px] text-[#6B6B6B] mb-1 font-medium'>Completion Rate</p>
+            <p className='text-[32px] font-bold text-[#1F1F1F] leading-none mb-2.5'>{stats.completionRate}%</p>
+            <div className='w-full bg-[#E8E8E0] h-1.5 rounded-full overflow-hidden'>
+              <div 
+                className='h-full bg-[#6B8E6F] rounded-full transition-all duration-500'
+                style={{ width: `${stats.completionRate}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className='grid grid-cols-1 lg:grid-cols-5 gap-3'>
+          {/* Student Performance Donut Chart */}
+          <div className='bg-white rounded-xl p-5 border border-[#E8E8E0] col-span-1 lg:col-span-2'>
+            <h3 className='text-[15px] font-semibold text-[#1F1F1F] mb-5'>Student Performance</h3>
+            <div className='flex flex-col items-center justify-center'>
+              {/* Donut Chart */}
+              <div className='relative w-40 h-40 mb-6'>
+                <svg className='w-full h-full transform -rotate-90' viewBox='0 0 100 100'>
+                  {/* Background circle */}
+                  <circle
+                    cx='50'
+                    cy='50'
+                    r='38'
+                    fill='none'
+                    stroke='#E8E8E0'
+                    strokeWidth='11'
+                  />
+                  {/* Excel segment (45%) - Green */}
+                  <circle
+                    cx='50'
+                    cy='50'
+                    r='38'
+                    fill='none'
+                    stroke='#6B8E6F'
+                    strokeWidth='11'
+                    strokeDasharray='107 239'
+                    strokeDashoffset='0'
+                    strokeLinecap='round'
+                  />
+                  {/* Satisfactory segment (35%) - Light Green */}
+                  <circle
+                    cx='50'
+                    cy='50'
+                    r='38'
+                    fill='none'
+                    stroke='#A5D6A7'
+                    strokeWidth='11'
+                    strokeDasharray='83 239'
+                    strokeDashoffset='-107'
+                    strokeLinecap='round'
+                  />
+                  {/* Needs segment (20%) - Light Red */}
+                  <circle
+                    cx='50'
+                    cy='50'
+                    r='38'
+                    fill='none'
+                    stroke='#FFCDD2'
+                    strokeWidth='11'
+                    strokeDasharray='48 239'
+                    strokeDashoffset='-190'
+                    strokeLinecap='round'
+                  />
+                </svg>
+                <div className='absolute inset-0 flex flex-col items-center justify-center'>
+                  <span className='text-[28px] font-bold text-[#1F1F1F]'>{stats.totalStudents}</span>
+                  <span className='text-[11px] text-[#6B6B6B] font-medium'>Total</span>
+                </div>
+              </div>
+              
+              {/* Legend */}
+              <div className='flex items-center justify-center gap-5 text-[11px]'>
+                <div className='flex items-center gap-1.5'>
+                  <div className='w-2.5 h-2.5 rounded-full bg-[#6B8E6F]'></div>
+                  <span className='text-[#6B6B6B] font-medium'>Excel (45%)</span>
+                </div>
+                <div className='flex items-center gap-1.5'>
+                  <div className='w-2.5 h-2.5 rounded-full bg-[#A5D6A7]'></div>
+                  <span className='text-[#6B6B6B] font-medium'>Satis (35%)</span>
+                </div>
+                <div className='flex items-center gap-1.5'>
+                  <div className='w-2.5 h-2.5 rounded-full bg-[#FFCDD2]'></div>
+                  <span className='text-[#6B6B6B] font-medium'>Needs (20%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Progress Line Chart */}
+          <div className='bg-white rounded-xl p-5 border border-[#E8E8E0] col-span-1 lg:col-span-3'>
+            <div className='flex items-center justify-between mb-5'>
+              <h3 className='text-[15px] font-semibold text-[#1F1F1F]'>Monthly Progress</h3>
+              <button className='text-[11px] text-[#6B6B6B] flex items-center gap-1 font-medium hover:text-[#6B8E6F] transition-colors'>
+                This Year
+                <svg className='w-3 h-3' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M19 9l-7 7-7-7' />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Line Chart */}
+            <div className='relative h-44'>
+              <svg className='w-full h-full' viewBox='0 0 600 170' preserveAspectRatio='none'>
+                {/* Grid lines */}
+                <line x1='0' y1='0' x2='600' y2='0' stroke='#E8E8E0' strokeWidth='1'/>
+                <line x1='0' y1='42.5' x2='600' y2='42.5' stroke='#E8E8E0' strokeWidth='1'/>
+                <line x1='0' y1='85' x2='600' y2='85' stroke='#E8E8E0' strokeWidth='1'/>
+                <line x1='0' y1='127.5' x2='600' y2='127.5' stroke='#E8E8E0' strokeWidth='1'/>
+                <line x1='0' y1='170' x2='600' y2='170' stroke='#E8E8E0' strokeWidth='1'/>
+                
+                {/* Area under curve */}
+                <path
+                  d='M 0 135 L 100 115 L 200 85 L 300 95 L 400 55 L 500 45 L 600 15 L 600 170 L 0 170 Z'
+                  fill='rgba(107, 142, 111, 0.08)'
+                />
+                
+                {/* Line */}
+                <path
+                  d='M 0 135 L 100 115 L 200 85 L 300 95 L 400 55 L 500 45 L 600 15'
+                  fill='none'
+                  stroke='#6B8E6F'
+                  strokeWidth='2.5'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+                
+                {/* Data points */}
+                <circle cx='0' cy='135' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='100' cy='115' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='200' cy='85' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='300' cy='95' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='400' cy='55' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='500' cy='45' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+                <circle cx='600' cy='15' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
+              </svg>
+              
+              {/* X-axis labels */}
+              <div className='flex justify-between mt-2 text-[11px] text-[#6B6B6B] font-medium px-1'>
+                <span>Jan</span>
+                <span>Feb</span>
+                <span>Mar</span>
+                <span>Apr</span>
+                <span>May</span>
+                <span>Jun</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Insights Section */}
+        <div>
+          <h3 className='text-[15px] font-semibold text-[#1F1F1F] mb-3'>Quick Insights</h3>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+            {/* Insight 1 - Students Improved */}
+            <div className='bg-white rounded-xl p-3.5 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+              <div className='flex items-start gap-3'>
+                <div className='w-9 h-9 bg-[#E8F5E9] rounded-lg flex items-center justify-center shrink-0'>
+                  <ArrowUpRight size={16} className='text-[#6B8E6F]' strokeWidth={2} />
+                </div>
+                <div className='flex-1'>
+                  <p className='text-[13px] text-[#1F1F1F] font-medium mb-1 leading-tight'>12 students improved this week.</p>
+                  <button 
+                    onClick={() => navigate('/teacher/analytics')}
+                    className='text-[11px] text-[#6B6B6B] hover:text-[#6B8E6F] transition-colors font-medium'
+                  >
+                    View details
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Insight 2 - Weakest Concept */}
+            <div className='bg-white rounded-xl p-3.5 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+              <div className='flex items-start gap-3'>
+                <div className='w-9 h-9 bg-[#FFEBEE] rounded-lg flex items-center justify-center shrink-0'>
+                  <AlertCircle size={16} className='text-[#D32F2F]' strokeWidth={2} />
+                </div>
+                <div className='flex-1'>
+                  <p className='text-[13px] text-[#1F1F1F] font-medium mb-1 leading-tight'>Recursion is the weakest concept.</p>
+                  <button 
+                    onClick={() => navigate('/teacher/programs')}
+                    className='text-[11px] text-[#6B6B6B] hover:text-[#6B8E6F] transition-colors font-medium'
+                  >
+                    Review curriculum
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Insight 3 - Pending Programs */}
+            <div className='bg-white rounded-xl p-3.5 border border-[#E8E8E0] transition-all duration-200 hover:shadow-sm'>
+              <div className='flex items-start gap-3'>
+                <div className='w-9 h-9 bg-[#E0F2F1] rounded-lg flex items-center justify-center shrink-0'>
+                  <PauseCircle size={16} className='text-[#00796B]' strokeWidth={2} />
+                </div>
+                <div className='flex-1'>
+                  <p className='text-[13px] text-[#1F1F1F] font-medium mb-1 leading-tight'>8 students haven't resumed pending programs.</p>
+                  <button 
+                    onClick={() => navigate('/teacher/analytics')}
+                    className='text-[11px] text-[#6B6B6B] hover:text-[#6B8E6F] transition-colors font-medium'
+                  >
+                    Send reminder
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

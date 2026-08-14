@@ -85,7 +85,7 @@ export default function StudentReport() {
         {/* Header */}
         <div className='flex items-start justify-between mb-6'>
           <div>
-            <h1 className='text-2xl font-bold text-gray-800'>
+            <h1 className='font-headline-lg text-headline-lg tracking-tight text-gray-800'>
               {student?.name || 'Student'}'s Report
             </h1>
             <p className='text-gray-500 text-sm mt-0.5'>

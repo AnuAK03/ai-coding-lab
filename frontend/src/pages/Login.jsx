@@ -146,7 +146,7 @@ export default function Login() {
 
           {/* Floating badge animations (same as landing hero) */}
           <div className='absolute inset-0 flex items-center justify-center px-6 lg:px-12'>
-            <div className={`relative max-w-md transition-all duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)]
+            <div className={`relative max-w-[448px] w-full transition-all duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)]
                            ${!reducedMotion ? 'opacity-100 translate-y-0' : 'opacity-100'}`}
                  style={{
                    animationDelay: '0ms',
@@ -222,7 +222,7 @@ export default function Login() {
         {/* ── FORM SIDE (Left half on desktop, bottom on mobile) ── */}
         <div className='lg:w-1/2 min-h-[70vh] lg:h-screen flex items-center justify-center p-6 lg:p-12 order-2 lg:order-1'>
           <div 
-            className={`w-full max-w-md transition-all duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)]
+            className={`w-full max-w-[448px] transition-all duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)]
                        ${!reducedMotion ? 'opacity-100 translate-y-0' : 'opacity-100'}`}
             style={{
               animationDelay: reducedMotion ? '0ms' : '200ms',

@@ -130,7 +130,7 @@ export default function StudentDetail() {
               {student.name ? student.name[0].toUpperCase() : '?'}
             </div>
             <div>
-              <h1 className={`text-xl font-bold ${t.text}`}>{student.name || 'Unknown Student'}</h1>
+              <h1 className={`font-headline-lg text-headline-lg tracking-tight ${t.text}`}>{student.name || 'Unknown Student'}</h1>
               <p className={`text-sm ${t.textMuted}`}>
                 {student.rollNumber} · {student.department} · Year {student.year} · {student.classId}
               </p>
