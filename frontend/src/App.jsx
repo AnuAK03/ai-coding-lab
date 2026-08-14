@@ -18,9 +18,12 @@ import Sessions from './pages/student/Sessions'
 import Session from './pages/student/Session'
 import Quiz from './pages/student/Quiz'
 import UnderstandLogic from './pages/student/UnderstandLogic'
+import MyProgress from './pages/student/MyProgress'
+import MyReport from './pages/student/MyReport'
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
 import TeacherProfile from './pages/teacher/Profile'
 import StudentReport from './pages/teacher/StudentReport'
+import StudentDetail from './pages/teacher/StudentDetail'
 import ClassAnalytics from './pages/teacher/ClassAnalytics'
 import UploadProgram from './pages/teacher/UploadProgram'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -74,6 +77,7 @@ export default function App() {
           <Route path='programs' element={<ProgramLibrary />} />
           <Route path='sessions' element={<Sessions user={user} />} />
           <Route path='profile' element={<Profile user={user} />} />
+          <Route path='progress' element={<MyProgress user={user} />} />
         </Route>
 
         {/* Student session routes - outside layout for fullscreen */}
@@ -93,6 +97,13 @@ export default function App() {
           </ProtectedRoute>
         } />
 
+        {/* Student report route - student views their own session report */}
+        <Route path='/student/report/:sessionId' element={
+          <ProtectedRoute user={user} role={role} requiredRole='student'>
+            <MyReport />
+          </ProtectedRoute>
+        } />
+
         {/* Teacher routes - wrapped in TeacherLayout */}
         <Route path='/teacher' element={
           <ProtectedRoute user={user} role={role} requiredRole='teacher'>
@@ -105,10 +116,17 @@ export default function App() {
           <Route path='profile' element={<TeacherProfile user={user} />} />
         </Route>
 
-        {/* Teacher report route - outside layout for fullscreen */}
+        {/* Teacher report route - outside layout */}
         <Route path='/teacher/report/:sessionId' element={
           <ProtectedRoute user={user} role={role} requiredRole='teacher'>
             <StudentReport />
+          </ProtectedRoute>
+        } />
+
+        {/* Teacher student detail route - full timeline for one student */}
+        <Route path='/teacher/student/:studentId' element={
+          <ProtectedRoute user={user} role={role} requiredRole='teacher'>
+            <StudentDetail />
           </ProtectedRoute>
         } />
 

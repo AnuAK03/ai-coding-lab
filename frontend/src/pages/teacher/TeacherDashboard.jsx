@@ -201,7 +201,7 @@ export default function TeacherDashboard({ user }) {
               <table className='w-full text-sm'>
                 <thead>
                   <tr className={`border-b ${t.borderSubtle}`}>
-                    {['Student ID','Program','Status','Quiz Score','Hints','Flagged',''].map(h => (
+                    {['Student','Program','Status','Quiz Score','Hints','Runs','Violations','Flagged',''].map(h => (
                       <th key={h} className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wide ${t.textSubtle}`}>
                         {h}
                       </th>
@@ -211,11 +211,11 @@ export default function TeacherDashboard({ user }) {
                 <tbody className={`divide-y ${t.borderSubtle}`}>
                   {sessions.map(s => (
                     <tr key={s.sessionId} className={`transition-colors ${t.hoverBg}`}>
-                      <td className={`px-4 py-3 font-mono text-xs ${t.textMuted}`}>
-                        {s.studentId?.slice(0,8)}...
+                      <td className={`px-4 py-3 font-medium text-xs ${t.text}`}>
+                        {s.studentName || s.studentId?.slice(0,8) + '...'}
                       </td>
                       <td className={`px-4 py-3 text-xs ${t.textMuted}`}>
-                        {s.programId?.slice(0,12)}...
+                        {s.programTitle || s.programId?.slice(0,12) + '...'}
                       </td>
                       <td className='px-4 py-3'>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium
@@ -231,6 +231,10 @@ export default function TeacherDashboard({ user }) {
                         {Math.round((s.quizScore||0)*100)}%
                       </td>
                       <td className={`px-4 py-3 ${t.textMuted} text-sm`}>{s.hintsUsed}/3</td>
+                      <td className={`px-4 py-3 ${t.textMuted} text-sm`}>{s.runAttempts ?? '—'}</td>
+                      <td className={`px-4 py-3 ${s.violationCount > 0 ? 'text-orange-400' : t.textMuted} text-sm`}>
+                        {s.violationCount ?? 0}
+                      </td>
                       <td className='px-4 py-3'>
                         {s.flagged && (
                           <span className={`text-xs font-medium ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>

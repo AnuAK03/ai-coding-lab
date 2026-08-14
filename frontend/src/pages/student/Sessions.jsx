@@ -469,9 +469,9 @@ export default function Sessions({ user }) {
                           </div>
                         </div>
                         
-                        {session.status === 'complete' && session.reportId && (
+                        {session.status === 'complete' && (
                           <button
-                            onClick={() => window.location.href = `/student/report/${session.reportId}`}
+                            onClick={() => window.location.href = `/student/report/${session.id}`}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
                                        ${theme === 'dark' 
                                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30' 

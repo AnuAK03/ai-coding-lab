@@ -41,6 +41,8 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(explainer.router, prefix='/api')
 app.include_router(chatbot.router, prefix='/api')
 
+# Student timeline route lives in reports router (GET /api/student/:id/timeline)
+
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "message": "CodeLab API running"}

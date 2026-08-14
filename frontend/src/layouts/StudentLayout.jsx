@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { 
   LayoutDashboard, Code2, History, User, 
-  Sun, Moon, Menu, X 
+  Sun, Moon, Menu, X, TrendingUp
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useTheme } from '../contexts/ThemeContext'
@@ -24,10 +24,11 @@ export default function StudentLayout({ user }) {
   }, [location.pathname])
 
   const navItems = [
-    { path: '/student/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { path: '/student/programs', label: 'Programs', icon: Code2 },
-    { path: '/student/sessions', label: 'Sessions', icon: History },
-    { path: '/student/profile', label: 'Profile', icon: User },
+    { path: '/student/dashboard', label: 'Overview',    icon: LayoutDashboard },
+    { path: '/student/programs',  label: 'Programs',    icon: Code2           },
+    { path: '/student/sessions',  label: 'Sessions',    icon: History         },
+    { path: '/student/progress',  label: 'My Progress', icon: TrendingUp      },
+    { path: '/student/profile',   label: 'Profile',     icon: User            },
   ]
 
   const isActive = (path) => location.pathname === path

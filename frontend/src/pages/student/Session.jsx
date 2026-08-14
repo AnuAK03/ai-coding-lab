@@ -37,6 +37,7 @@ export default function Session() {
   const {
     sessionId, code, setCode, output, runCount,
     isRunning, isSaving, elapsed, handleRun, saveAndFinalize,
+    incrementHintsUsed, saveTestResults,
   } = useSession(user, program)
   const {
     violations,
@@ -75,6 +76,7 @@ export default function Session() {
     try {
       const result = await runTests(code, program.testCases)
       setTestResults(result)
+      saveTestResults(result)   // FEATURE: persist test results to Firestore
     } catch (err) {
       console.error('Test run failed:', err)
     } finally {
@@ -177,18 +179,18 @@ export default function Session() {
 
           <button
             onClick={() => setShowHints(true)}
-            disabled={hintsUsed >= 3}
+            disabled={hintsUsed >= (program?.hintLimit ?? 3)}
             className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5
     rounded-lg transition-colors
-    ${hintsUsed >= 3
+    ${hintsUsed >= (program?.hintLimit ?? 3)
                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                 : 'bg-yellow-500 hover:bg-yellow-400 text-gray-900'
               }`}
           >
             <Lightbulb size={14} />
-            {hintsUsed >= 3
+            {hintsUsed >= (program?.hintLimit ?? 3)
               ? 'No hints'
-              : `Hint (${3 - hintsUsed} left)`}
+              : `Hint (${(program?.hintLimit ?? 3) - hintsUsed} left)`}
           </button>
           <button onClick={handleSubmit}
             className={`flex items-center gap-1.5 text-sm font-medium px-4 py-1.5
@@ -353,7 +355,11 @@ export default function Session() {
           program={program}
           code={code}
           hintsUsed={hintsUsed}
-          onHintUsed={() => setHintsUsed(prev => prev + 1)}
+          onHintUsed={() => {
+            const next = hintsUsed + 1
+            setHintsUsed(next)
+            incrementHintsUsed(next)   // FIX BUG 9: persist immediately
+          }}
           onClose={() => setShowHints(false)}
         />
       )}
