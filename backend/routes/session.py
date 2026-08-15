@@ -172,9 +172,16 @@ def submit_session(
         
         # Update status in Firestore immediately
         db = firestore.client()
-        db.collection('sessions').document(req.sessionId).update({
-            'status': 'submitted'
-        })
+        db.collection('sessions').document(req.sessionId).set({
+            'status': 'submitted',
+            'userId': req.userId,
+            'studentId': getattr(req, 'studentId', req.userId),
+            'programId': req.programId,
+            'finalCode': req.finalCode,
+            'timeSpent': req.timeSpent,
+            'quizAnswers': req.quizAnswers,
+            'quizScore': req.quizScore
+        }, merge=True)
         
         print(f"[Submit] Session {req.sessionId} marked as submitted in Firestore")
         

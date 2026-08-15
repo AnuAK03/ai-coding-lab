@@ -1,12 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../../services/firebase'
 import { 
   Pencil, Mail, Phone, Building, ChevronDown, 
   Lock, Shield, ChevronRight
 } from 'lucide-react'
 
-export default function Profile() {
+export default function Profile({ user }) {
   const [emailNotifs, setEmailNotifs] = useState(true)
   const [lightTheme, setLightTheme] = useState(true)
+  const [profileData, setProfileData] = useState({ name: '', department: '', phone: '' })
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user?.uid) return
+      const d = await getDoc(doc(db, 'users', user.uid))
+      if (d.exists()) {
+        setProfileData({
+          name: d.data().name || 'Unknown Teacher',
+          department: d.data().department || 'Computer Science',
+          phone: d.data().phone || '+1 (555) 000-0000'
+        })
+      }
+    }
+    loadProfile()
+  }, [user])
 
   return (
     <div className='min-h-[calc(100vh-64px)] bg-background text-text-primary p-xl overflow-y-auto relative'>
@@ -33,8 +51,8 @@ export default function Profile() {
             <div className='px-8 pb-8 flex flex-col items-center -mt-12'>
               <div className='relative mb-4'>
                 <img 
-                  src="https://ui-avatars.com/api/?name=Alan+Turing&background=0b1f13&color=fff&size=150" 
-                  alt="Dr. Alan Turing" 
+                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name)}&background=0b1f13&color=fff&size=150`} 
+                  alt={profileData.name} 
                   className='w-24 h-24 rounded-full border-4 border-white object-cover shadow-sm'
                 />
                 <button className='absolute bottom-0 right-0 bg-[#2e5939] text-white p-1.5 rounded-full border-2 border-white hover:bg-[#1a3822] transition-colors'>
@@ -42,9 +60,9 @@ export default function Profile() {
                 </button>
               </div>
 
-              <h2 className='font-headline-md text-[24px] text-text-primary mb-1'>Dr. Alan Turing</h2>
+              <h2 className='font-headline-md text-[24px] text-text-primary mb-1'>{profileData.name}</h2>
               <p className='font-label-md text-[13px] text-text-secondary tracking-normal mb-5'>
-                Senior Instructor, Computer Science
+                Instructor, {profileData.department}
               </p>
 
               <div className='flex items-center gap-2 mb-8'>
@@ -63,7 +81,7 @@ export default function Profile() {
                     <Mail size={16} className='absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary' />
                     <input 
                       type="text" 
-                      defaultValue="alan.turing@codelab.edu"
+                      value={user?.email || ''}
                       className='w-full bg-[#f4f4ec] border-none text-text-primary font-body-sm text-[14px] rounded-xl pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-[#2e5939]/20'
                       readOnly
                     />
@@ -86,7 +104,7 @@ export default function Profile() {
                     <Building size={16} className='absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary' />
                     <input 
                       type="text" 
-                      defaultValue="Computer Science"
+                      value={profileData.department}
                       className='w-full bg-[#f4f4ec] border-none text-text-primary font-body-sm text-[14px] rounded-xl pl-11 pr-10 py-3 outline-none cursor-pointer'
                       readOnly
                     />

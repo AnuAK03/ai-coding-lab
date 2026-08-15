@@ -78,7 +78,7 @@ export default function Login() {
     }
   }
 
-  // Theme classes (same pattern as Landing page)
+  // Theme classes
   const t = {
     dark: {
       bg: 'bg-[#0F0F10]',
@@ -96,19 +96,19 @@ export default function Login() {
       errorText: 'text-red-400'
     },
     light: {
-      bg: 'bg-[#FAFAFA]',
-      text: 'text-[#171717]',
-      textMuted: 'text-[#737373]',
-      border: 'border-[#E5E5E5]',
+      bg: 'bg-[#fcfaf5]', // beige
+      text: 'text-gray-900',
+      textMuted: 'text-gray-500',
+      border: 'border-[#e2e8f0]',
       inputBg: 'bg-white',
-      inputBorder: 'border-[#E5E5E5]',
-      inputFocus: 'focus:border-[#6366F1] focus:ring-[#6366F1]/20',
-      accent: 'bg-[#6366F1]',
-      accentHover: 'hover:bg-[#4F46E5]',
-      accentText: 'text-[#6366F1]',
-      errorBg: 'bg-red-50',
-      errorBorder: 'border-red-200',
-      errorText: 'text-red-700'
+      inputBorder: 'border-[#e2e8f0]',
+      inputFocus: 'focus:border-[#4a6f55] focus:ring-[#4a6f55]/20',
+      accent: 'bg-[#4a6f55]',
+      accentHover: 'hover:bg-[#3d5c46]',
+      accentText: 'text-[#4a6f55]',
+      errorBg: 'bg-[#fff1f2]',
+      errorBorder: 'border-[#fecdd3]',
+      errorText: 'text-[#f43f5e]'
     }
   }[theme]
 
@@ -134,13 +134,13 @@ export default function Login() {
         
         {/* ── BRAND SIDE (Right half on desktop, top on mobile) ── */}
         <div className='lg:w-1/2 h-[30vh] lg:h-screen relative overflow-hidden order-1 lg:order-2'>
-          {/* Gradient background (consistent with landing hero) */}
+          {/* Gradient background */}
           <div 
             className='absolute inset-0 transition-all duration-300'
             style={{
               background: theme === 'dark'
                 ? 'linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(99, 102, 241, 0.08) 50%, rgba(79, 70, 229, 0.12) 100%)'
-                : 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.08) 50%, rgba(167, 139, 250, 0.1) 100%)'
+                : 'linear-gradient(135deg, rgba(74, 111, 85, 0.08) 0%, rgba(74, 111, 85, 0.04) 50%, rgba(74, 111, 85, 0.06) 100%)'
             }}
           />
 
@@ -160,20 +160,20 @@ export default function Login() {
                      style={{ animationDelay: '0ms' }}>
                   <Lightbulb size={20} className={theme === 'dark' ? 'text-amber-500' : 'text-amber-600'} strokeWidth={2} />
                 </div>
-                <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full border-[3px] ${theme === 'dark' ? 'border-emerald-600' : 'border-emerald-500'} flex items-center justify-center
+                <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full border-[3px] ${theme === 'dark' ? 'border-emerald-600' : 'border-[#4a6f55]'} flex items-center justify-center
                                ${!reducedMotion ? 'animate-float-delayed' : ''}`}
                      style={{ animationDelay: '400ms' }}>
-                  <Terminal size={20} className={theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'} strokeWidth={2} />
+                  <Terminal size={20} className={theme === 'dark' ? 'text-emerald-500' : 'text-[#4a6f55]'} strokeWidth={2} />
                 </div>
-                <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full border-[3px] ${theme === 'dark' ? 'border-blue-600' : 'border-blue-500'} flex items-center justify-center
+                <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full border-[3px] ${theme === 'dark' ? 'border-blue-600' : 'border-[#3d5c46]'} flex items-center justify-center
                                ${!reducedMotion ? 'animate-float-delayed-2' : ''}`}
                      style={{ animationDelay: '800ms' }}>
-                  <BarChart3 size={20} className={theme === 'dark' ? 'text-blue-500' : 'text-blue-600'} strokeWidth={2} />
+                  <BarChart3 size={20} className={theme === 'dark' ? 'text-blue-500' : 'text-[#3d5c46]'} strokeWidth={2} />
                 </div>
               </div>
 
               {/* Brand copy */}
-              <h2 className='hidden lg:block text-3xl lg:text-4xl font-bold text-center leading-tight mb-6'>
+              <h2 className='hidden lg:block text-3xl lg:text-4xl font-serif font-bold text-center leading-tight mb-6'>
                 Guided hints.
                 <br />
                 Real code.
@@ -186,8 +186,8 @@ export default function Login() {
                 <div 
                   className='rounded-2xl border overflow-hidden transition-all duration-300'
                   style={{
-                    backgroundColor: theme === 'dark' ? 'rgba(26, 26, 29, 0.5)' : 'rgba(255, 255, 255, 0.4)',
-                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)',
+                    backgroundColor: theme === 'dark' ? 'rgba(26, 26, 29, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+                    borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.6)',
                     backdropFilter: 'blur(16px)',
                     WebkitBackdropFilter: 'blur(16px)'
                   }}
@@ -195,7 +195,7 @@ export default function Login() {
                   {/* Mini editor chrome */}
                   <div className={`px-4 py-3 flex items-center gap-2 border-b ${t.border}`}
                        style={{
-                         backgroundColor: theme === 'dark' ? 'rgba(26, 26, 29, 0.6)' : 'rgba(245, 245, 245, 0.6)'
+                         backgroundColor: theme === 'dark' ? 'rgba(26, 26, 29, 0.6)' : 'rgba(245, 245, 245, 0.8)'
                        }}>
                     <div className='w-2.5 h-2.5 rounded-full bg-red-400/50' />
                     <div className='w-2.5 h-2.5 rounded-full bg-yellow-400/50' />
@@ -203,7 +203,7 @@ export default function Login() {
                   </div>
                   {/* Mini code snippet */}
                   <div className='p-4 font-mono text-xs lg:text-sm space-y-1.5'>
-                    <div className={theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}>
+                    <div className={theme === 'dark' ? 'text-purple-400' : 'text-[#4a6f55]'}>
                       def solve_problem():
                     </div>
                     <div className={`${t.textMuted} pl-4`}>
@@ -235,18 +235,18 @@ export default function Login() {
               style={{
                 backgroundColor: theme === 'dark' 
                   ? 'rgba(26, 26, 29, 0.7)' 
-                  : 'rgba(255, 255, 255, 0.7)',
-                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.4)',
+                  : 'rgba(255, 255, 255, 0.9)',
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)',
                 backdropFilter: 'blur(24px) saturate(150%)',
                 WebkitBackdropFilter: 'blur(24px) saturate(150%)',
                 boxShadow: theme === 'dark'
                   ? '0 20px 60px rgba(0, 0, 0, 0.3)'
-                  : '0 20px 60px rgba(0, 0, 0, 0.08)'
+                  : '0 20px 60px rgba(0, 0, 0, 0.05)'
               }}
             >
               {/* Header */}
               <div className='mb-8'>
-                <h1 className='text-3xl lg:text-4xl font-bold mb-2'>Welcome back</h1>
+                <h1 className='text-3xl lg:text-4xl font-serif font-bold mb-2'>Welcome back</h1>
                 <p className={`${t.textMuted} text-base`}>
                   Sign in to continue your learning
                 </p>

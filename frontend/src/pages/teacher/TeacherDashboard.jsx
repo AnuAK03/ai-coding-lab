@@ -13,7 +13,9 @@ export default function TeacherDashboard({ user }) {
     totalStudents: 0,
     belowAverage: 0,
     activePrograms: 0,
-    completionRate: 0
+    completionRate: 0,
+    distribution: { excel: 0, satis: 0, needs: 0 },
+    monthlyData: [0, 0, 0, 0, 0, 0]
   })
   const [loading, setLoading] = useState(true)
 
@@ -27,6 +29,19 @@ export default function TeacherDashboard({ user }) {
         // Count students
         const studentQ = query(collection(db, 'users'), where('role', '==', 'student'))
         const studentSnap = await getDocs(studentQ)
+        const students = studentSnap.docs.map(d => d.data())
+
+        let excel = 0, satis = 0, needs = 0
+        students.forEach(s => {
+          const score = s.avgScore || 0
+          if (score >= 0.8) excel++
+          else if (score >= 0.5) satis++
+          else needs++
+        })
+
+        // Count active programs
+        const progQ = query(collection(db, 'programs'), where('active', '==', true))
+        const progSnap = await getDocs(progQ)
 
         // Count sessions
         const sessionSnap = await getDocs(collection(db, 'sessions'))
@@ -38,16 +53,23 @@ export default function TeacherDashboard({ user }) {
           ? Math.round((completedSessions / sessionsData.length) * 100) 
           : 0
 
-        // Calculate below average (students with quiz score < 70%)
-        const belowAverage = sessionsData.filter(s => 
-          s.status === 'complete' && (s.quizScore || 0) < 0.7
-        ).length
+        // Calculate monthly completions for the first 6 months
+        const monthlyCounts = [0, 0, 0, 0, 0, 0]
+        sessionsData.forEach(s => {
+          if (s.status === 'complete' && s.createdAt) {
+            const date = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
+            const m = date.getMonth()
+            if (m < 6) monthlyCounts[m]++
+          }
+        })
 
         setStats({
           totalStudents: studentSnap.size,
-          belowAverage: belowAverage,
-          activePrograms: 12,
-          completionRate: completionRate
+          belowAverage: needs,
+          activePrograms: progSnap.size,
+          completionRate: completionRate,
+          distribution: { excel, satis, needs },
+          monthlyData: monthlyCounts
         })
 
       } catch (e) {
@@ -162,7 +184,7 @@ export default function TeacherDashboard({ user }) {
                     stroke='#E8E8E0'
                     strokeWidth='11'
                   />
-                  {/* Excel segment (45%) - Green */}
+                  {/* Excel segment - Green */}
                   <circle
                     cx='50'
                     cy='50'
@@ -170,11 +192,11 @@ export default function TeacherDashboard({ user }) {
                     fill='none'
                     stroke='#6B8E6F'
                     strokeWidth='11'
-                    strokeDasharray='107 239'
+                    strokeDasharray={`${(stats.distribution.excel / (stats.totalStudents || 1)) * 239} 239`}
                     strokeDashoffset='0'
                     strokeLinecap='round'
                   />
-                  {/* Satisfactory segment (35%) - Light Green */}
+                  {/* Satisfactory segment - Light Green */}
                   <circle
                     cx='50'
                     cy='50'
@@ -182,11 +204,11 @@ export default function TeacherDashboard({ user }) {
                     fill='none'
                     stroke='#A5D6A7'
                     strokeWidth='11'
-                    strokeDasharray='83 239'
-                    strokeDashoffset='-107'
+                    strokeDasharray={`${(stats.distribution.satis / (stats.totalStudents || 1)) * 239} 239`}
+                    strokeDashoffset={`-${(stats.distribution.excel / (stats.totalStudents || 1)) * 239}`}
                     strokeLinecap='round'
                   />
-                  {/* Needs segment (20%) - Light Red */}
+                  {/* Needs segment - Light Red */}
                   <circle
                     cx='50'
                     cy='50'
@@ -194,8 +216,8 @@ export default function TeacherDashboard({ user }) {
                     fill='none'
                     stroke='#FFCDD2'
                     strokeWidth='11'
-                    strokeDasharray='48 239'
-                    strokeDashoffset='-190'
+                    strokeDasharray={`${(stats.distribution.needs / (stats.totalStudents || 1)) * 239} 239`}
+                    strokeDashoffset={`-${((stats.distribution.excel + stats.distribution.satis) / (stats.totalStudents || 1)) * 239}`}
                     strokeLinecap='round'
                   />
                 </svg>
@@ -209,15 +231,15 @@ export default function TeacherDashboard({ user }) {
               <div className='flex items-center justify-center gap-5 text-[11px]'>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#6B8E6F]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Excel (45%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Excel ({Math.round((stats.distribution.excel / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#A5D6A7]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Satis (35%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Satis ({Math.round((stats.distribution.satis / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#FFCDD2]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Needs (20%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Needs ({Math.round((stats.distribution.needs / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
               </div>
             </div>
@@ -235,51 +257,23 @@ export default function TeacherDashboard({ user }) {
               </button>
             </div>
             
-            {/* Line Chart */}
-            <div className='relative h-44'>
-              <svg className='w-full h-full' viewBox='0 0 600 170' preserveAspectRatio='none'>
-                {/* Grid lines */}
-                <line x1='0' y1='0' x2='600' y2='0' stroke='#E8E8E0' strokeWidth='1'/>
-                <line x1='0' y1='42.5' x2='600' y2='42.5' stroke='#E8E8E0' strokeWidth='1'/>
-                <line x1='0' y1='85' x2='600' y2='85' stroke='#E8E8E0' strokeWidth='1'/>
-                <line x1='0' y1='127.5' x2='600' y2='127.5' stroke='#E8E8E0' strokeWidth='1'/>
-                <line x1='0' y1='170' x2='600' y2='170' stroke='#E8E8E0' strokeWidth='1'/>
-                
-                {/* Area under curve */}
-                <path
-                  d='M 0 135 L 100 115 L 200 85 L 300 95 L 400 55 L 500 45 L 600 15 L 600 170 L 0 170 Z'
-                  fill='rgba(107, 142, 111, 0.08)'
-                />
-                
-                {/* Line */}
-                <path
-                  d='M 0 135 L 100 115 L 200 85 L 300 95 L 400 55 L 500 45 L 600 15'
-                  fill='none'
-                  stroke='#6B8E6F'
-                  strokeWidth='2.5'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                />
-                
-                {/* Data points */}
-                <circle cx='0' cy='135' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='100' cy='115' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='200' cy='85' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='300' cy='95' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='400' cy='55' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='500' cy='45' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-                <circle cx='600' cy='15' r='3.5' fill='white' stroke='#6B8E6F' strokeWidth='2'/>
-              </svg>
-              
-              {/* X-axis labels */}
-              <div className='flex justify-between mt-2 text-[11px] text-[#6B6B6B] font-medium px-1'>
-                <span>Jan</span>
-                <span>Feb</span>
-                <span>Mar</span>
-                <span>Apr</span>
-                <span>May</span>
-                <span>Jun</span>
-              </div>
+            {/* Dynamic Bar Chart */}
+            <div className='flex items-end justify-between h-44 pb-2 px-2'>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, idx) => {
+                const count = stats.monthlyData[idx]
+                const max = Math.max(...stats.monthlyData, 1) // prevent div by zero
+                const heightPct = Math.round((count / max) * 100)
+                return (
+                  <div key={month} className='flex flex-col items-center gap-2 h-full justify-end w-full group'>
+                    <span className='text-[10px] text-[#6B6B6B] opacity-0 group-hover:opacity-100 transition-opacity'>{count}</span>
+                    <div 
+                      className='w-1/2 md:w-8 bg-[#6B8E6F] rounded-t-sm transition-all duration-500'
+                      style={{ height: `${heightPct}%`, minHeight: count > 0 ? '4px' : '0' }}
+                    ></div>
+                    <span className='text-[11px] text-[#6B6B6B] font-medium'>{month}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

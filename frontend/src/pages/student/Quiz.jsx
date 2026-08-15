@@ -22,7 +22,7 @@ export default function Quiz() {
 
   // Generate quiz on mount
   useEffect(() => {
-    if (!program || !studentCode) {
+    if (!program || studentCode === undefined) {
       navigate('/student/programs')
       return
     }
@@ -98,11 +98,11 @@ export default function Quiz() {
 
   // ── Loading state ──
   if (loading) return (
-    <div className='min-h-screen bg-gray-900 flex items-center justify-center'>
+    <div className='min-h-screen bg-[#fcfaf5] flex items-center justify-center'>
       <div className='text-center'>
-        <Loader2 size={32} className='text-blue-400 animate-spin mx-auto mb-3' />
-        <p className='text-gray-400 text-sm'>Generating your quiz...</p>
-        <p className='text-gray-600 text-xs mt-1'>
+        <Loader2 size={32} className='text-[#4a6f55] animate-spin mx-auto mb-3' />
+        <p className='text-gray-600 text-sm'>Generating your quiz...</p>
+        <p className='text-gray-500 text-xs mt-1'>
           This takes a few seconds
         </p>
       </div>
@@ -111,13 +111,13 @@ export default function Quiz() {
 
   // ── Error state ──
   if (error) return (
-    <div className='min-h-screen bg-gray-900 flex items-center justify-center p-4'>
-      <div className='bg-gray-800 rounded-xl p-6 max-w-md text-center'>
-        <XCircle size={32} className='text-red-400 mx-auto mb-3' />
-        <p className='text-red-300 text-sm mb-4'>{error}</p>
+    <div className='min-h-screen bg-[#fcfaf5] flex items-center justify-center p-4'>
+      <div className='bg-white border border-[#e2e8f0] rounded-xl p-6 max-w-md text-center shadow-sm'>
+        <XCircle size={32} className='text-red-500 mx-auto mb-3' />
+        <p className='text-red-600 text-sm mb-4'>{error}</p>
         <button
           onClick={() => navigate('/student/programs')}
-          className='text-blue-400 underline text-sm'
+          className='text-[#4a6f55] underline font-medium text-sm hover:text-[#3d5c46]'
         >
           Back to programs
         </button>
@@ -127,22 +127,22 @@ export default function Quiz() {
 
   // ── Results screen (after submission) ──
   if (submitted && score) return (
-    <div className='min-h-screen bg-gray-900 flex items-center justify-center p-4'>
-      <div className='bg-gray-800 rounded-2xl p-8 max-w-lg w-full'>
+    <div className='min-h-screen bg-[#fcfaf5] flex items-center justify-center p-4 py-8'>
+      <div className='bg-white border border-[#e2e8f0] shadow-sm rounded-2xl p-8 max-w-lg w-full'>
         <div className='text-center mb-6'>
-          <CheckCircle size={48} className='text-green-400 mx-auto mb-3' />
-          <h1 className='text-white text-2xl font-bold'>Session Complete!</h1>
-          <p className='text-gray-400 text-sm mt-1'>
+          <CheckCircle size={48} className='text-[#10b981] mx-auto mb-3' />
+          <h1 className='text-gray-900 text-2xl font-serif font-bold'>Session Complete!</h1>
+          <p className='text-gray-500 font-medium text-sm mt-1'>
             {program.title}
           </p>
         </div>
 
         {/* Score display */}
-        <div className='bg-gray-900 rounded-xl p-4 text-center mb-6'>
-          <p className='text-5xl font-bold text-white mb-1'>
+        <div className='bg-[#fcfaf5] border border-[#e2e8f0] rounded-xl p-4 text-center mb-6'>
+          <p className='text-5xl font-bold text-gray-900 mb-1'>
             {score.correct}/{score.total}
           </p>
-          <p className='text-gray-400 text-sm'>
+          <p className='text-gray-500 font-medium text-sm'>
             {Math.round(score.value * 100)}% score
           </p>
         </div>
@@ -156,15 +156,15 @@ export default function Quiz() {
               <div key={q.id}
                    className={`rounded-lg p-3 border
                                ${isCorrect
-                                   ? 'bg-green-900/30 border-green-800'
-                                   : 'bg-red-900/30 border-red-800'}`}
+                                   ? 'bg-[#10b981]/10 border-[#10b981]/30'
+                                   : 'bg-[#f43f5e]/10 border-[#f43f5e]/30'}`}
               >
-                <p className='text-gray-200 text-sm mb-1'>{q.question}</p>
-                <p className={`text-xs font-medium
-                               ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                <p className='text-gray-800 font-medium text-sm mb-1'>{q.question}</p>
+                <p className={`text-xs font-bold
+                               ${isCorrect ? 'text-[#10b981]' : 'text-[#f43f5e]'}`}>
                   {isCorrect ? '✓ Correct' : `✗ You answered ${studentAns} — correct: ${q.correctAnswer}`}
                 </p>
-                <p className='text-gray-500 text-xs mt-0.5'>{q.explanation}</p>
+                <p className='text-gray-600 font-medium text-xs mt-0.5'>{q.explanation}</p>
               </div>
             )
           })}
@@ -172,8 +172,8 @@ export default function Quiz() {
 
         <button
           onClick={() => navigate('/student/dashboard')}
-          className='w-full bg-blue-600 hover:bg-blue-700 text-white
-                     font-semibold py-2.5 rounded-lg transition-colors text-sm'
+          className='w-full bg-[#4a6f55] hover:bg-[#3d5c46] text-white
+                     font-bold py-3 rounded-lg transition-colors text-sm'
         >
           Back to Dashboard
         </button>
@@ -186,17 +186,17 @@ export default function Quiz() {
   const allAnswered   = answeredCount === questions.length
 
   return (
-    <div className='min-h-screen bg-gray-900 py-8 px-4'>
+    <div className='min-h-screen bg-[#fcfaf5] py-8 px-4'>
       <div className='max-w-2xl mx-auto'>
 
         {/* Quiz header */}
         <div className='flex items-center gap-3 mb-6'>
-          <BookOpen size={20} className='text-blue-400' />
+          <BookOpen size={20} className='text-[#4a6f55]' />
           <div>
-            <h1 className='text-white font-bold'>Viva Quiz</h1>
-            <p className='text-gray-400 text-xs'>{program.title}</p>
+            <h1 className='text-gray-900 font-serif font-bold'>Viva Quiz</h1>
+            <p className='text-gray-500 font-medium text-xs mt-0.5'>{program.title}</p>
           </div>
-          <span className='ml-auto text-xs text-gray-500'>
+          <span className='ml-auto text-xs font-bold text-gray-500 bg-white border border-[#e2e8f0] px-3 py-1.5 rounded-full'>
             {answeredCount}/{questions.length} answered
           </span>
         </div>
@@ -205,22 +205,22 @@ export default function Quiz() {
         <div className='space-y-5'>
           {questions.map((q, idx) => (
             <div key={q.id}
-                 className='bg-gray-800 rounded-xl p-5 border border-gray-700'>
-              <p className='text-gray-200 text-sm font-medium mb-3'>
-                <span className='text-blue-400 mr-2'>Q{idx + 1}.</span>
+                 className='bg-white shadow-sm rounded-xl p-6 border border-[#e2e8f0]'>
+              <p className='text-gray-900 text-sm font-bold mb-4'>
+                <span className='text-[#4a6f55] mr-2'>Q{idx + 1}.</span>
                 {q.question}
               </p>
-              <div className='space-y-2'>
+              <div className='space-y-2.5'>
                 {q.options.map(opt => (
                   <button
                     key={opt.label}
                     onClick={() => handleAnswer(q.id, opt.label)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors border ${
+                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors border font-medium ${
                         answers[q.id] === opt.label
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'}`}
+                        ? 'bg-[#4a6f55] border-[#4a6f55] text-white'
+                        : 'bg-white border-[#e2e8f0] text-gray-700 hover:bg-[#fcfaf5]'}`}
                   >
-                    <span className='font-semibold mr-2'>{opt.label}.</span>
+                    <span className='font-bold mr-2 opacity-80'>{opt.label}.</span>
                     {opt.text}
                   </button>
                 ))}
@@ -233,11 +233,11 @@ export default function Quiz() {
         <button
           onClick={handleSubmitQuiz}
           disabled={!allAnswered}
-          className={`w-full mt-6 py-3 rounded-xl font-semibold text-sm
-                       transition-colors
+          className={`w-full mt-8 py-3.5 rounded-xl font-bold text-sm
+                       transition-colors shadow-sm
                        ${allAnswered
-                           ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                           : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+                           ? 'bg-[#4a6f55] hover:bg-[#3d5c46] text-white'
+                           : 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'}`}
         >
           {allAnswered
             ? 'Submit Quiz'

@@ -1,0 +1,151 @@
+{
+  "generated_at": "2026-08-15T05:53:26.241821",
+  "summary": {
+    "total_sessions": 30,
+    "performance_distribution": {
+      "excellent": 12,
+      "satisfactory": 13,
+      "needs_attention": 5
+    },
+    "flagged_sessions": 6,
+    "flagged_percentage": 20.0,
+    "average_quiz_score": 63.61
+  },
+  "weaknesses": {
+    "top_areas_for_improvement": [
+      [
+        "Code structure",
+        6
+      ],
+      [
+        "scope",
+        4
+      ],
+      [
+        "Logic optimization",
+        3
+      ],
+      [
+        "Syntax errors",
+        2
+      ],
+      [
+        "arrays",
+        2
+      ]
+    ],
+    "total_unique_weaknesses": 8
+  },
+  "student_performance": [
+    {
+      "student_id": "iMQBMn8OGFZMhUeOgASj7XuSVJ93",
+      "sessions": 5,
+      "avg_score": 90.6,
+      "violations": 2
+    },
+    {
+      "student_id": "k67R9HTyWIf8PDIw9Hqi04L6oU33",
+      "sessions": 4,
+      "avg_score": 86.0,
+      "violations": 0
+    },
+    {
+      "student_id": "GMtoCZgMddQaCoHaiY6TxS7v90q1",
+      "sessions": 4,
+      "avg_score": 81.0,
+      "violations": 0
+    },
+    {
+      "student_id": "09QdVVSgLEYhIV9WTL44gHS2pLE3",
+      "sessions": 4,
+      "avg_score": 76.5,
+      "violations": 0
+    },
+    {
+      "student_id": "yEte41ZoTXW3KYZ1JczjiDWdvrf2",
+      "sessions": 3,
+      "avg_score": 71.33,
+      "violations": 2
+    },
+    {
+      "student_id": "9I4knil8HaZQthEr0OwkTI0ram32",
+      "sessions": 4,
+      "avg_score": 65.75,
+      "violations": 1
+    },
+    {
+      "student_id": "N34WbeP21ObXZ5eeoyw9458Wzqu1",
+      "sessions": 1,
+      "avg_score": 1.0,
+      "violations": 3
+    },
+    {
+      "student_id": "test_student_001",
+      "sessions": 1,
+      "avg_score": 0.75,
+      "violations": 1
+    },
+    {
+      "student_id": "JtiKhhLtqzXVcpcWgGl1WPXWth03",
+      "sessions": 3,
+      "avg_score": 0.73,
+      "violations": 0
+    },
+    {
+      "student_id": "test_student_002_poor",
+      "sessions": 1,
+      "avg_score": 0.25,
+      "violations": 3
+    }
+  ],
+  "program_analysis": [
+    {
+      "program_id": "test_program_002",
+      "attempts": 1,
+      "avg_score": 0.25,
+      "difficulty_level": "Hard"
+    },
+    {
+      "program_id": "test_program_001",
+      "attempts": 1,
+      "avg_score": 0.75,
+      "difficulty_level": "Hard"
+    },
+    {
+      "program_id": "yrqOuhbEPzmVESz4Ov9i",
+      "attempts": 4,
+      "avg_score": 0.8,
+      "difficulty_level": "Hard"
+    },
+    {
+      "program_id": "48nKSpIuWZhF1N1UoShc",
+      "attempts": 6,
+      "avg_score": 77.33,
+      "difficulty_level": "Medium"
+    },
+    {
+      "program_id": "nA8gUQGNhAIKDchST4Ri",
+      "attempts": 4,
+      "avg_score": 79.25,
+      "difficulty_level": "Medium"
+    },
+    {
+      "program_id": "FToNN2gBxamf1heJe2Nb",
+      "attempts": 6,
+      "avg_score": 79.33,
+      "difficulty_level": "Medium"
+    },
+    {
+      "program_id": "SCPzSmXwembjcFYcjQws",
+      "attempts": 4,
+      "avg_score": 79.75,
+      "difficulty_level": "Medium"
+    },
+    {
+      "program_id": "wwo4EfH4vsNC20EaiSxL",
+      "attempts": 4,
+      "avg_score": 82.0,
+      "difficulty_level": "Medium"
+    }
+  ]
+}

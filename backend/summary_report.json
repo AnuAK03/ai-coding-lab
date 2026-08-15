@@ -1,0 +1,61 @@
+{
+  "generation_time": "2026-08-15T05:53:27.826282",
+  "class_summary": {
+    "total_sessions": 30,
+    "performance_distribution": {
+      "excellent": 12,
+      "satisfactory": 13,
+      "needs_attention": 5
+    },
+    "flagged_sessions": 6,
+    "flagged_percentage": 20.0,
+    "average_quiz_score": 63.61
+  },
+  "top_performers": [
+    {
+      "name": "Priya Nair",
+      "avg_score": 90.6,
+      "sessions": 5
+    },
+    {
+      "name": "Ananya Singh",
+      "avg_score": 86.0,
+      "sessions": 4
+    },
+    {
+      "name": "Maya Reddy",
+      "avg_score": 81.0,
+      "sessions": 4
+    },
+    {
+      "name": "Arjun Patel",
+      "avg_score": 76.5,
+      "sessions": 4
+    },
+    {
+      "name": "Kiran Kumar",
+      "avg_score": 71.33,
+      "sessions": 3
+    }
+  ],
+  "students_needing_attention": [
+    {
+      "name": "Rohan Mehta",
+      "avg_score": 65.75,
+      "weakness": "Logic flow",
+      "violations": 1
+    },
+    {
+      "name": "Arthi",
+      "avg_score": 0.73,
+      "weakness": "scope",
+      "violations": 0
+    },
+    {
+      "name": "AnuAk",
+      "avg_score": 1.0,
+      "weakness": "scope",
+      "violations": 3
+    }
+  ]
+}

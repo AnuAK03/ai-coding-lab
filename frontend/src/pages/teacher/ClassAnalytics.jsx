@@ -1,8 +1,106 @@
+import { useEffect, useState } from 'react'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '../../services/firebase'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Download, Star, CheckCircle2, AlertTriangle, Search, Bell } from 'lucide-react'
 
 export default function ClassAnalytics() {
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState({
+    totalStudents: 0,
+    distribution: { excel: 0, satis: 0, needs: 0 },
+    histogram: [0, 0, 0, 0, 0, 0, 0],
+    weakConcepts: [],
+    topExcel: [],
+    topSatis: [],
+    topNeeds: [],
+    trendData: [0, 0, 0, 0, 0, 0]
+  })
+
+  useEffect(() => {
+    async function loadAnalytics() {
+      try {
+        const studentQ = query(collection(db, 'users'), where('role', '==', 'student'))
+        const studentSnap = await getDocs(studentQ)
+        const students = studentSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+        let excel = 0, satis = 0, needs = 0
+        const topExcel = [], topSatis = [], topNeeds = []
+        const histogram = [0, 0, 0, 0, 0, 0, 0]
+
+        students.forEach(s => {
+          const score = s.avgScore || 0
+          const pct = Math.round(score * 100)
+          
+          if (score >= 0.8) { excel++; topExcel.push(s) }
+          else if (score >= 0.5) { satis++; topSatis.push(s) }
+          else { needs++; topNeeds.push(s) }
+
+          if (pct < 40) histogram[0]++
+          else if (pct < 50) histogram[1]++
+          else if (pct < 60) histogram[2]++
+          else if (pct < 70) histogram[3]++
+          else if (pct < 80) histogram[4]++
+          else if (pct < 90) histogram[5]++
+          else histogram[6]++
+        })
+
+        topExcel.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
+        topSatis.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
+        topNeeds.sort((a, b) => (a.avgScore || 0) - (b.avgScore || 0))
+
+        const sessionSnap = await getDocs(collection(db, 'sessions'))
+        const sessions = sessionSnap.docs.map(d => d.data())
+
+        const conceptCounts = {}
+        let totalConcepts = 0
+        sessions.forEach(s => {
+          if (s.status === 'complete' && s.report?.quizAnalysis?.weak_concepts) {
+            s.report.quizAnalysis.weak_concepts.forEach(c => {
+              conceptCounts[c] = (conceptCounts[c] || 0) + 1
+              totalConcepts++
+            })
+          }
+        })
+
+        const weakConcepts = Object.entries(conceptCounts)
+          .map(([name, count]) => ({ name, count, pct: Math.round((count / Math.max(totalConcepts, 1)) * 100) }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 6)
+          
+        const monthlyScores = [0,0,0,0,0,0]
+        const monthlyCounts = [0,0,0,0,0,0]
+        sessions.forEach(s => {
+          if (s.status === 'complete' && s.createdAt) {
+            const date = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
+            const m = date.getMonth()
+            if (m < 6) {
+              monthlyScores[m] += (s.quizScore || 0)
+              monthlyCounts[m]++
+            }
+          }
+        })
+        const trendData = monthlyScores.map((score, idx) => monthlyCounts[idx] > 0 ? Math.round((score / monthlyCounts[idx]) * 100) : 0)
+
+        setData({
+          totalStudents: students.length,
+          distribution: { excel, satis, needs },
+          histogram,
+          weakConcepts,
+          topExcel, topSatis, topNeeds,
+          trendData
+        })
+      } catch (e) {
+        console.error('Failed to load analytics', e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadAnalytics()
+  }, [])
+
+  if (loading) return <div className='flex-1 flex items-center justify-center min-h-screen'><p>Loading analytics...</p></div>
 
   return (
     <div className='min-h-[calc(100vh-64px)] bg-background text-text-primary p-xl overflow-y-auto'>
@@ -42,17 +140,22 @@ export default function ClassAnalytics() {
               {/* Donut Chart SVG */}
               <div className='relative w-[180px] h-[180px]'>
                 <svg viewBox="0 0 100 100" className='w-full h-full transform -rotate-90'>
-                  {/* Excellent (Dark Green) - roughly 45% */}
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#4a6f55" strokeWidth="16" strokeDasharray="113 251" strokeDashoffset="0" />
-                  {/* Satisfactory (Medium Green) - roughly 35% */}
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#7a9b83" strokeWidth="16" strokeDasharray="88 251" strokeDashoffset="-113" />
-                  {/* Needs Attention (Light Green) - roughly 20% */}
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#d0e1d4" strokeWidth="16" strokeDasharray="50 251" strokeDashoffset="-201" />
+                  {/* Excellent (Dark Green) */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#4a6f55" strokeWidth="16" 
+                    strokeDasharray={`${(data.distribution.excel / Math.max(data.totalStudents, 1)) * 251} 251`} strokeDashoffset="0" />
+                  {/* Satisfactory (Medium Green) */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#7a9b83" strokeWidth="16" 
+                    strokeDasharray={`${(data.distribution.satis / Math.max(data.totalStudents, 1)) * 251} 251`} 
+                    strokeDashoffset={`-${(data.distribution.excel / Math.max(data.totalStudents, 1)) * 251}`} />
+                  {/* Needs Attention (Light Green) */}
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#d0e1d4" strokeWidth="16" 
+                    strokeDasharray={`${(data.distribution.needs / Math.max(data.totalStudents, 1)) * 251} 251`} 
+                    strokeDashoffset={`-${((data.distribution.excel + data.distribution.satis) / Math.max(data.totalStudents, 1)) * 251}`} />
                 </svg>
                 
                 {/* Center Text */}
                 <div className='absolute inset-0 flex flex-col items-center justify-center'>
-                  <span className='font-headline-lg text-[28px] text-text-primary leading-none mb-1'>240</span>
+                  <span className='font-headline-lg text-[28px] text-text-primary leading-none mb-1'>{data.totalStudents}</span>
                   <span className='font-label-md text-[10px] text-text-secondary uppercase tracking-wide'>Total Students</span>
                 </div>
               </div>
@@ -84,37 +187,21 @@ export default function ClassAnalytics() {
               </span>
             </div>
 
-            <div className='flex-1 relative w-full h-[200px] mt-2'>
-              {/* Background Lines */}
-              <div className='absolute inset-0 flex flex-col justify-between'>
-                <div className='w-full h-px bg-outline-variant/20'></div>
-                <div className='w-full h-px bg-outline-variant/20'></div>
-                <div className='w-full h-px bg-outline-variant/20'></div>
-                <div className='w-full h-px bg-outline-variant/20'></div>
-              </div>
-              
-              {/* Line Chart SVG */}
-              <svg className='absolute inset-0 w-full h-full' preserveAspectRatio="none">
-                <path d="M 0 170 C 50 150, 80 130, 150 120 C 220 110, 250 100, 300 100 C 350 100, 400 80, 450 70 C 500 60, 550 50, 600 50 C 650 50, 700 20, 750 10" 
-                      fill="none" stroke="#5d7c67" strokeWidth="2" />
-                
-                {/* Data Points */}
-                <circle cx="150" cy="120" r="5" fill="#fff" stroke="#d0e1d4" strokeWidth="2" />
-                <circle cx="300" cy="100" r="5" fill="#fff" stroke="#d0e1d4" strokeWidth="2" />
-                <circle cx="450" cy="70" r="5" fill="#fff" stroke="#d0e1d4" strokeWidth="2" />
-                <circle cx="600" cy="50" r="5" fill="#fff" stroke="#d0e1d4" strokeWidth="2" />
-                <circle cx="750" cy="10" r="5" fill="#fff" stroke="#d0e1d4" strokeWidth="2" />
-              </svg>
-
-              {/* X-Axis Labels */}
-              <div className='absolute -bottom-6 left-0 right-0 flex justify-between px-2'>
-                <span className='font-label-md text-[11px] text-text-secondary'>Wk 1</span>
-                <span className='font-label-md text-[11px] text-text-secondary ml-10'>Wk 3</span>
-                <span className='font-label-md text-[11px] text-text-secondary ml-8'>Wk 5</span>
-                <span className='font-label-md text-[11px] text-text-secondary ml-8'>Wk 7</span>
-                <span className='font-label-md text-[11px] text-text-secondary ml-8'>Wk 9</span>
-                <span className='font-label-md text-[11px] text-text-secondary'>Midterm</span>
-              </div>
+            <div className='flex-1 relative w-full h-[200px] mt-2 flex items-end justify-between px-4'>
+              {/* Dynamic Bar Chart */}
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, idx) => {
+                const avg = data.trendData[idx]
+                return (
+                  <div key={month} className='flex flex-col items-center gap-2 h-full justify-end w-full group'>
+                    <span className='text-[11px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity'>{avg}%</span>
+                    <div 
+                      className='w-1/2 md:w-10 bg-[#5d7c67] rounded-t-sm transition-all duration-500 hover:bg-[#4a6f55]'
+                      style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0' }}
+                    ></div>
+                    <span className='font-label-md text-[11px] text-text-secondary'>{month}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -135,13 +222,16 @@ export default function ClassAnalytics() {
               </div>
 
               {/* Bars */}
-              <div className='w-[12%] h-[15%] bg-[#e3ece5] rounded-t-sm ml-6'></div>
-              <div className='w-[12%] h-[35%] bg-[#d0e1d4] rounded-t-sm'></div>
-              <div className='w-[12%] h-[60%] bg-[#7a9b83] rounded-t-sm'></div>
-              <div className='w-[12%] h-[90%] bg-[#5d7c67] rounded-t-sm'></div>
-              <div className='w-[12%] h-[75%] bg-[#7a9b83] rounded-t-sm'></div>
-              <div className='w-[12%] h-[40%] bg-[#d0e1d4] rounded-t-sm'></div>
-              <div className='w-[12%] h-[20%] bg-[#e3ece5] rounded-t-sm'></div>
+              {data.histogram.map((count, idx) => {
+                const max = Math.max(...data.histogram, 1)
+                const heightPct = Math.round((count / max) * 100)
+                const colors = ['bg-[#e3ece5]', 'bg-[#d0e1d4]', 'bg-[#7a9b83]', 'bg-[#5d7c67]', 'bg-[#7a9b83]', 'bg-[#d0e1d4]', 'bg-[#e3ece5]']
+                return (
+                  <div key={idx} className={`w-[12%] ${colors[idx]} rounded-t-sm transition-all duration-500 relative group`} style={{ height: `${heightPct}%`, minHeight: count > 0 ? '4px' : '0' }}>
+                    <span className='absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity'>{count}</span>
+                  </div>
+                )
+              })}
               
               {/* X-Axis Labels */}
               <div className='absolute -bottom-2 left-6 right-0 flex justify-between pr-2'>
@@ -161,54 +251,18 @@ export default function ClassAnalytics() {
             <h3 className='font-headline-md text-[20px] text-text-primary mb-6 pb-4 border-b border-outline-variant/30'>Most Common Weak Concepts</h3>
             
             <div className='flex flex-col gap-4'>
-              {/* Row 1 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>Pointers</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#b04040] rounded-full w-[85%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>85%</span>
-              </div>
-              {/* Row 2 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>Recursion</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#c95252] rounded-full w-[72%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>72%</span>
-              </div>
-              {/* Row 3 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>OOP</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#df8080] rounded-full w-[58%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>58%</span>
-              </div>
-              {/* Row 4 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>Arrays</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#5d7c67] rounded-full w-[45%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>45%</span>
-              </div>
-              {/* Row 5 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>Functions</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#7a9b83] rounded-full w-[30%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>30%</span>
-              </div>
-              {/* Row 6 */}
-              <div className='flex items-center gap-4'>
-                <span className='w-24 text-right font-label-md text-[13px] text-text-secondary'>Loops</span>
-                <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
-                  <div className='h-full bg-[#d0e1d4] rounded-full w-[15%]'></div>
-                </div>
-                <span className='w-10 font-label-md text-[13px] text-text-secondary'>15%</span>
-              </div>
+              {data.weakConcepts.length > 0 ? data.weakConcepts.map((concept, idx) => {
+                const colors = ['bg-[#b04040]', 'bg-[#c95252]', 'bg-[#df8080]', 'bg-[#5d7c67]', 'bg-[#7a9b83]', 'bg-[#d0e1d4]']
+                return (
+                  <div key={idx} className='flex items-center gap-4'>
+                    <span className='w-24 text-right font-label-md text-[13px] text-text-secondary capitalize truncate' title={concept.name}>{concept.name.replace('_', ' ')}</span>
+                    <div className='flex-1 h-3 bg-[#f4f4ec] rounded-full overflow-hidden'>
+                      <div className={`h-full ${colors[idx % colors.length]} rounded-full transition-all duration-500`} style={{ width: `${concept.pct}%` }}></div>
+                    </div>
+                    <span className='w-10 font-label-md text-[13px] text-text-secondary'>{concept.pct}%</span>
+                  </div>
+                )
+              }) : <p className='text-[13px] text-text-secondary'>No concepts analysed yet.</p>}
             </div>
           </div>
         </div>
@@ -230,26 +284,18 @@ export default function ClassAnalytics() {
               </div>
               <div className='p-6 flex-1'>
                 <div className='flex flex-col gap-5'>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-182</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>Sarah Jenkins</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>98%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-145</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>Michael Chen</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>95%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-089</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>Aisha Patel</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>92%</span>
-                  </div>
+                  {data.topExcel.length > 0 ? data.topExcel.slice(0, 3).map((student, idx) => (
+                    <div key={idx} className='flex items-center justify-between'>
+                      <span className='font-mono text-[12px] text-text-secondary w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
+                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
+                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                    </div>
+                  )) : <p className='text-[13px] text-text-secondary'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-outline-variant/20 mt-auto'>
                 <button className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors'>
-                  View All 84 Students
+                  View All {data.distribution.excel} Students
                 </button>
               </div>
             </div>
@@ -265,26 +311,18 @@ export default function ClassAnalytics() {
               </div>
               <div className='p-6 flex-1'>
                 <div className='flex flex-col gap-5'>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-211</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>David Kim</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>85%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-177</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>Emily Thorne</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>78%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-text-secondary w-12'>R-042</span>
-                    <span className='font-body-md text-[14px] text-text-primary flex-1'>James Wilson</span>
-                    <span className='font-label-md text-[13px] text-text-primary font-bold'>65%</span>
-                  </div>
+                  {data.topSatis.length > 0 ? data.topSatis.slice(0, 3).map((student, idx) => (
+                    <div key={idx} className='flex items-center justify-between'>
+                      <span className='font-mono text-[12px] text-text-secondary w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
+                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
+                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                    </div>
+                  )) : <p className='text-[13px] text-text-secondary'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-outline-variant/20 mt-auto'>
                 <button className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors'>
-                  View All 108 Students
+                  View All {data.distribution.satis} Students
                 </button>
               </div>
             </div>
@@ -303,26 +341,18 @@ export default function ClassAnalytics() {
               </div>
               <div className='p-6 flex-1 relative z-10'>
                 <div className='flex flex-col gap-5'>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-[#b04040]/70 w-12'>R-015</span>
-                    <span className='font-body-md text-[14px] text-[#6b2525] flex-1'>Robert Fox</span>
-                    <span className='font-label-md text-[13px] text-error font-bold'>58%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-[#b04040]/70 w-12'>R-199</span>
-                    <span className='font-body-md text-[14px] text-[#6b2525] flex-1'>Lisa Wong</span>
-                    <span className='font-label-md text-[13px] text-error font-bold'>52%</span>
-                  </div>
-                  <div className='flex items-center justify-between'>
-                    <span className='font-mono text-[12px] text-[#b04040]/70 w-12'>R-256</span>
-                    <span className='font-body-md text-[14px] text-[#6b2525] flex-1'>Tom Harris</span>
-                    <span className='font-label-md text-[13px] text-error font-bold'>45%</span>
-                  </div>
+                  {data.topNeeds.length > 0 ? data.topNeeds.slice(0, 3).map((student, idx) => (
+                    <div key={idx} className='flex items-center justify-between'>
+                      <span className='font-mono text-[12px] text-[#b04040]/70 w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
+                      <span className='font-body-md text-[14px] text-[#6b2525] flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
+                      <span className='font-label-md text-[13px] text-error font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                    </div>
+                  )) : <p className='text-[13px] text-[#6b2525]/70'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-error/20 mt-auto relative z-10'>
                 <button className='font-label-md text-[12px] text-error hover:opacity-80 transition-opacity font-bold'>
-                  View All 48 Students
+                  View All {data.distribution.needs} Students
                 </button>
               </div>
             </div>

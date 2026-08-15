@@ -1,0 +1,288 @@
+{
+  "09QdVVSgLEYhIV9WTL44gHS2pLE3": {
+    "student_info": {
+      "id": "09QdVVSgLEYhIV9WTL44gHS2pLE3",
+      "name": "Arjun Patel",
+      "email": "arjun.patel@lab.com",
+      "roll_number": "CS001",
+      "class_id": "CS-2-A",
+      "streak": 7,
+      "badges": [
+        "First Program",
+        "Quiz Master",
+        "Consistent Learner"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 4,
+      "completed_sessions": 4,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 76.5,
+      "recent_performance": 76.5,
+      "performance_trend": "Stable",
+      "average_completion_time": 19.2
+    },
+    "behavioral_analysis": {
+      "total_violations": 0,
+      "flagged_sessions": 0,
+      "integrity_score": 100,
+      "dominant_weakness": "Code structure",
+      "weakness_frequency": 2
+    },
+    "recommendations": [
+      "\ud83d\udcda Solid foundation! Practice more complex algorithms and data structures.",
+      "\ud83c\udfaf Focus on improving: Code structure"
+    ]
+  },
+  "9I4knil8HaZQthEr0OwkTI0ram32": {
+    "student_info": {
+      "id": "9I4knil8HaZQthEr0OwkTI0ram32",
+      "name": "Rohan Mehta",
+      "email": "rohan.mehta@lab.com",
+      "roll_number": "CS003",
+      "class_id": "CS-2-A",
+      "streak": 3,
+      "badges": [
+        "First Program",
+        "Consistent Learner"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 5,
+      "completed_sessions": 4,
+      "in_progress_sessions": 1,
+      "average_quiz_score": 65.75,
+      "recent_performance": 65.75,
+      "performance_trend": "Stable",
+      "average_completion_time": 30.5
+    },
+    "behavioral_analysis": {
+      "total_violations": 1,
+      "flagged_sessions": 0,
+      "integrity_score": 90,
+      "dominant_weakness": "Logic flow",
+      "weakness_frequency": 2
+    },
+    "recommendations": [
+      "\ud83d\udcaa Focus on fundamentals. Review basic programming concepts and practice regularly.",
+      "\u26a1 Minor violations noted. Stay focused during sessions.",
+      "\ud83e\udde0 Work on problem-solving and logical thinking skills."
+    ]
+  },
+  "GMtoCZgMddQaCoHaiY6TxS7v90q1": {
+    "student_info": {
+      "id": "GMtoCZgMddQaCoHaiY6TxS7v90q1",
+      "name": "Maya Reddy",
+      "email": "maya.reddy@lab.com",
+      "roll_number": "CS006",
+      "class_id": "CS-2-B",
+      "streak": 9,
+      "badges": [
+        "First Program",
+        "Quiz Master",
+        "Logic Master"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 4,
+      "completed_sessions": 4,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 81.0,
+      "recent_performance": 81.0,
+      "performance_trend": "Stable",
+      "average_completion_time": 20.8
+    },
+    "behavioral_analysis": {
+      "total_violations": 0,
+      "flagged_sessions": 0,
+      "integrity_score": 100,
+      "dominant_weakness": "Code structure",
+      "weakness_frequency": 3
+    },
+    "recommendations": [
+      "\ud83d\udc4d Good performance! Focus on consistency and tackling medium-difficulty problems.",
+      "\ud83c\udfaf Focus on improving: Code structure"
+    ]
+  },
+  "JtiKhhLtqzXVcpcWgGl1WPXWth03": {
+    "student_info": {
+      "id": "JtiKhhLtqzXVcpcWgGl1WPXWth03",
+      "name": "Arthi",
+      "email": "arthi@gmail.com",
+      "roll_number": "001",
+      "class_id": "CS-1-A",
+      "streak": 2,
+      "badges": [
+        "clean_code",
+        "speed_run",
+        "first_program",
+        "no_hints"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 10,
+      "completed_sessions": 3,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 0.73,
+      "recent_performance": 0.73,
+      "performance_trend": "Stable",
+      "average_completion_time": 1.4
+    },
+    "behavioral_analysis": {
+      "total_violations": 0,
+      "flagged_sessions": 3,
+      "integrity_score": 25,
+      "dominant_weakness": "scope",
+      "weakness_frequency": 3
+    },
+    "recommendations": [
+      "\ud83d\udcaa Focus on fundamentals. Review basic programming concepts and practice regularly.",
+      "\ud83c\udfaf Focus on improving: scope"
+    ]
+  },
+  "N34WbeP21ObXZ5eeoyw9458Wzqu1": {
+    "student_info": {
+      "id": "N34WbeP21ObXZ5eeoyw9458Wzqu1",
+      "name": "AnuAk",
+      "email": "anu26@gmail.com",
+      "roll_number": "CS2026001",
+      "class_id": "CS-1-A",
+      "streak": 1,
+      "badges": [
+        "speed_run",
+        "no_hints",
+        "perfect_quiz",
+        "first_program"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 10,
+      "completed_sessions": 1,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 1.0,
+      "recent_performance": 1.0,
+      "performance_trend": "Stable",
+      "average_completion_time": 0.7
+    },
+    "behavioral_analysis": {
+      "total_violations": 3,
+      "flagged_sessions": 1,
+      "integrity_score": 45,
+      "dominant_weakness": "scope",
+      "weakness_frequency": 1
+    },
+    "recommendations": [
+      "\ud83d\udcaa Focus on fundamentals. Review basic programming concepts and practice regularly.",
+      "\u26a1 Minor violations noted. Stay focused during sessions.",
+      "\ud83c\udfaf Focus on improving: scope"
+    ]
+  },
+  "iMQBMn8OGFZMhUeOgASj7XuSVJ93": {
+    "student_info": {
+      "id": "iMQBMn8OGFZMhUeOgASj7XuSVJ93",
+      "name": "Priya Nair",
+      "email": "priya.nair@lab.com",
+      "roll_number": "CS002",
+      "class_id": "CS-2-A",
+      "streak": 12,
+      "badges": [
+        "First Program",
+        "Quiz Master",
+        "Perfect Score",
+        "Speed Coder"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 5,
+      "completed_sessions": 5,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 90.6,
+      "recent_performance": 90.6,
+      "performance_trend": "Stable",
+      "average_completion_time": 12.8
+    },
+    "behavioral_analysis": {
+      "total_violations": 2,
+      "flagged_sessions": 1,
+      "integrity_score": 55,
+      "dominant_weakness": "Minor syntax issues",
+      "weakness_frequency": 1
+    },
+    "recommendations": [
+      "\ud83c\udf1f Excellent performance! Consider taking on more challenging advanced problems.",
+      "\u26a1 Minor violations noted. Stay focused during sessions.",
+      "\ud83d\udd24 Practice basic syntax through coding exercises."
+    ]
+  },
+  "k67R9HTyWIf8PDIw9Hqi04L6oU33": {
+    "student_info": {
+      "id": "k67R9HTyWIf8PDIw9Hqi04L6oU33",
+      "name": "Ananya Singh",
+      "email": "ananya.singh@lab.com",
+      "roll_number": "CS004",
+      "class_id": "CS-2-A",
+      "streak": 15,
+      "badges": [
+        "First Program",
+        "Quiz Master",
+        "Algorithm Expert",
+        "Speed Coder"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 4,
+      "completed_sessions": 4,
+      "in_progress_sessions": 0,
+      "average_quiz_score": 86.0,
+      "recent_performance": 86.0,
+      "performance_trend": "Stable",
+      "average_completion_time": 15.8
+    },
+    "behavioral_analysis": {
+      "total_violations": 0,
+      "flagged_sessions": 0,
+      "integrity_score": 100,
+      "dominant_weakness": "Minor syntax issues",
+      "weakness_frequency": 1
+    },
+    "recommendations": [
+      "\ud83d\udc4d Good performance! Focus on consistency and tackling medium-difficulty problems.",
+      "\ud83d\udd24 Practice basic syntax through coding exercises."
+    ]
+  },
+  "yEte41ZoTXW3KYZ1JczjiDWdvrf2": {
+    "student_info": {
+      "id": "yEte41ZoTXW3KYZ1JczjiDWdvrf2",
+      "name": "Kiran Kumar",
+      "email": "kiran.kumar@lab.com",
+      "roll_number": "CS005",
+      "class_id": "CS-2-B",
+      "streak": 5,
+      "badges": [
+        "First Program",
+        "Debugging Master"
+      ]
+    },
+    "performance_summary": {
+      "total_sessions": 4,
+      "completed_sessions": 3,
+      "in_progress_sessions": 1,
+      "average_quiz_score": 71.33,
+      "recent_performance": 71.33,
+      "performance_trend": "Stable",
+      "average_completion_time": 24.7
+    },
+    "behavioral_analysis": {
+      "total_violations": 2,
+      "flagged_sessions": 1,
+      "integrity_score": 55,
+      "dominant_weakness": "Logic optimization",
+      "weakness_frequency": 1
+    },
+    "recommendations": [
+      "\ud83d\udcda Solid foundation! Practice more complex algorithms and data structures.",
+      "\u26a1 Minor violations noted. Stay focused during sessions.",
+      "\ud83e\udde0 Work on problem-solving and logical thinking skills."
+    ]
+  }
+}

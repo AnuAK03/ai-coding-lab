@@ -69,21 +69,21 @@ export default function StreakHeatmap({ userId, theme = 'dark' }) {
   const getColor = (count) => {
     if (count === 0) {
       return theme === 'dark' 
-        ? 'bg-white/5 border-white/10' 
-        : 'bg-gray-200/50 border-gray-300/50'
+        ? 'bg-[#161b22] border-white/5' 
+        : 'bg-[#ebedf0] border-black/5'
     }
     
-    // Accent colors with intensity
+    // Accent colors with intensity (GitHub green)
     const colors = theme === 'dark' ? {
-      1: 'bg-indigo-500/20 border-indigo-400/30',
-      2: 'bg-indigo-500/40 border-indigo-400/50',
-      3: 'bg-indigo-500/60 border-indigo-400/70',
-      4: 'bg-indigo-500/80 border-indigo-400/90'
+      1: 'bg-[#0e4429] border-transparent',
+      2: 'bg-[#006d32] border-transparent',
+      3: 'bg-[#26a641] border-transparent',
+      4: 'bg-[#39d353] border-transparent'
     } : {
-      1: 'bg-indigo-200 border-indigo-300',
-      2: 'bg-indigo-300 border-indigo-400',
-      3: 'bg-indigo-400 border-indigo-500',
-      4: 'bg-indigo-500 border-indigo-600'
+      1: 'bg-[#9be9a8] border-transparent',
+      2: 'bg-[#40c463] border-transparent',
+      3: 'bg-[#30a14e] border-transparent',
+      4: 'bg-[#216e39] border-transparent'
     }
     
     // Cap at 4+ sessions
@@ -109,13 +109,13 @@ export default function StreakHeatmap({ userId, theme = 'dark' }) {
 
   return (
     <div className='overflow-x-auto pb-2'>
-      <div className='flex gap-0.5 min-w-max'>
+      <div className='flex gap-1 min-w-max'>
         {weeks.map((week, weekIdx) => (
-          <div key={weekIdx} className='flex flex-col gap-0.5'>
+          <div key={weekIdx} className='flex flex-col gap-1'>
             {week.map((day) => (
               <div
                 key={day.date}
-                className={`w-2.5 h-2.5 rounded-sm border transition-all duration-200 hover:scale-150 ${getColor(day.count)}`}
+                className={`w-4 h-4 rounded-sm border transition-all duration-200 hover:scale-125 ${getColor(day.count)}`}
                 title={`${day.date}: ${day.count} session${day.count !== 1 ? 's' : ''}`}
               />
             ))}
@@ -124,13 +124,13 @@ export default function StreakHeatmap({ userId, theme = 'dark' }) {
       </div>
       
       {/* Legend */}
-      <div className={`flex items-center gap-1.5 mt-3 text-[10px] ${theme === 'dark' ? 'text-[#A1A1A3]' : 'text-[#737373]'}`}>
+      <div className={`flex items-center gap-1.5 mt-4 text-[11px] ${theme === 'dark' ? 'text-[#A1A1A3]' : 'text-[#737373]'}`}>
         <span>Less</span>
-        <div className={`w-2.5 h-2.5 rounded-sm border ${getColor(0)}`} />
-        <div className={`w-2.5 h-2.5 rounded-sm border ${getColor(1)}`} />
-        <div className={`w-2.5 h-2.5 rounded-sm border ${getColor(2)}`} />
-        <div className={`w-2.5 h-2.5 rounded-sm border ${getColor(3)}`} />
-        <div className={`w-2.5 h-2.5 rounded-sm border ${getColor(4)}`} />
+        <div className={`w-4 h-4 rounded-sm border ${getColor(0)}`} />
+        <div className={`w-4 h-4 rounded-sm border ${getColor(1)}`} />
+        <div className={`w-4 h-4 rounded-sm border ${getColor(2)}`} />
+        <div className={`w-4 h-4 rounded-sm border ${getColor(3)}`} />
+        <div className={`w-4 h-4 rounded-sm border ${getColor(4)}`} />
         <span>More</span>
       </div>
     </div>
