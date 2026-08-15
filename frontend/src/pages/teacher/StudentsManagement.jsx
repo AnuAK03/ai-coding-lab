@@ -645,52 +645,6 @@ export default function StudentsManagement() {
           })()}
         </aside>
       )}
-                  View All
-                </span>
-              </div>
-              <div className='flex gap-3'>
-                <div className='flex flex-col items-center gap-1 group'>
-                  <div className='w-10 h-10 rounded-full bg-tertiary-container border border-tertiary/30 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(56,102,103,0.3)]'>
-                    <span className='material-symbols-outlined text-tertiary text-[20px]'>bug_report</span>
-                  </div>
-                  <span className='font-label-md text-[9px] text-on-surface-variant text-center'>
-                    Bug Smasher
-                  </span>
-                </div>
-                <div className='flex flex-col items-center gap-1 group'>
-                  <div className='w-10 h-10 rounded-full bg-primary-container border border-primary/30 flex items-center justify-center group-hover:scale-110 transition-transform'>
-                    <span className='material-symbols-outlined text-primary text-[20px]'>speed</span>
-                  </div>
-                  <span className='font-label-md text-[9px] text-on-surface-variant text-center'>
-                    Optimizer
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Instructor Notes */}
-            <div className='bg-surface-container rounded-2xl p-3 border border-outline-variant/30 flex-1 flex flex-col'>
-              <div className='flex justify-between items-center mb-2'>
-                <h4 className='font-label-md text-[11px] text-text-secondary uppercase flex items-center gap-1.5'>
-                  <span className='material-symbols-outlined text-[14px]'>edit_note</span>
-                  Private Notes
-                </h4>
-                <button className='text-on-surface-variant hover:text-text-primary'>
-                  <span className='material-symbols-outlined text-[16px]'>add</span>
-                </button>
-              </div>
-              <div className='bg-background/80 rounded-lg p-2.5 border border-outline-variant/30 flex-1'>
-                <p className='font-body-sm text-[12px] text-text-secondary/90 leading-relaxed italic'>
-                  "{selectedStudent.name} is performing exceptionally well in core logic but struggles slightly with visualizing non-linear data structures. Scheduled a brief 1:1 for Thursday to review Red-Black tree rebalancing."
-                </p>
-                <p className='font-label-md text-[9px] text-on-surface-variant/70 mt-1.5 text-right'>
-                  Added Oct 24, 09:15 AM
-                </p>
-              </div>
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* Edit Profile Modal */}
       {editingStudent && (
