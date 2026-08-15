@@ -104,7 +104,7 @@ def update_streak(db, student_id: str) -> int:
     last_session   = user.get('lastSessionDate')
     current_streak = user.get('streak', 0)
 
-    if last_session is None:
+    if last_session is None or current_streak == 0:
         new_streak = 1
     else:
         # FIX: Firestore returns DatetimeWithNanoseconds (timezone-aware).
@@ -127,7 +127,7 @@ def update_streak(db, student_id: str) -> int:
             days_gap = 999  # safe fallback — resets streak
 
         if days_gap == 0:
-            new_streak = current_streak
+            new_streak = max(1, current_streak)
         elif days_gap <= 2:
             new_streak = current_streak + 1
         else:

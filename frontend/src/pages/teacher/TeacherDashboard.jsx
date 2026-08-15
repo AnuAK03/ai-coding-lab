@@ -5,9 +5,14 @@ import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { Users, AlertTriangle, BookOpen, CheckCircle, TrendingUp, TrendingDown, ArrowUpRight, AlertCircle, PauseCircle } from 'lucide-react'
 
+const MONTHS_FROM_AUG = ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul']
+
 export default function TeacherDashboard({ user }) {
   const navigate = useNavigate()
   const { theme } = useOutletContext()
+  const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState(2026)
+  const [allSessionsData, setAllSessionsData] = useState([])
   
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -15,9 +20,7 @@ export default function TeacherDashboard({ user }) {
     activePrograms: 0,
     completionRate: 0,
     distribution: { excel: 0, satis: 0, needs: 0 },
-    monthlyData: [0, 0, 0, 0, 0, 0]
   })
-  const [loading, setLoading] = useState(true)
 
   // Get current date
   const dateOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
@@ -26,7 +29,7 @@ export default function TeacherDashboard({ user }) {
   useEffect(() => {
     async function loadStats() {
       try {
-        // Count students
+        // Fetch students
         const studentQ = query(collection(db, 'users'), where('role', '==', 'student'))
         const studentSnap = await getDocs(studentQ)
         const students = studentSnap.docs.map(d => d.data())
@@ -46,22 +49,13 @@ export default function TeacherDashboard({ user }) {
         // Count sessions
         const sessionSnap = await getDocs(collection(db, 'sessions'))
         const sessionsData = sessionSnap.docs.map(d => d.data())
+        setAllSessionsData(sessionsData)
 
         // Calculate completion rate
-        const completedSessions = sessionsData.filter(s => s.status === 'complete').length
+        const completedSessions = sessionsData.filter(s => s.status === 'complete' || s.status === 'submitted').length
         const completionRate = sessionsData.length > 0 
           ? Math.round((completedSessions / sessionsData.length) * 100) 
           : 0
-
-        // Calculate monthly completions for the first 6 months
-        const monthlyCounts = [0, 0, 0, 0, 0, 0]
-        sessionsData.forEach(s => {
-          if (s.status === 'complete' && s.createdAt) {
-            const date = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
-            const m = date.getMonth()
-            if (m < 6) monthlyCounts[m]++
-          }
-        })
 
         setStats({
           totalStudents: studentSnap.size,
@@ -69,7 +63,6 @@ export default function TeacherDashboard({ user }) {
           activePrograms: progSnap.size,
           completionRate: completionRate,
           distribution: { excel, satis, needs },
-          monthlyData: monthlyCounts
         })
 
       } catch (e) {
@@ -80,6 +73,33 @@ export default function TeacherDashboard({ user }) {
     }
     loadStats()
   }, [])
+
+  // Calculate 12-month data starting from August for selectedYear
+  const currentMonthlyCounts = Array(12).fill(0)
+  allSessionsData.forEach(s => {
+    if (s.status === 'complete' || s.status === 'submitted') {
+      const rawDate = s.createdAt || s.startedAt || s.submittedAt
+      if (!rawDate) return
+      let dateObj
+      if (rawDate.seconds) dateObj = new Date(rawDate.seconds * 1000)
+      else if (rawDate.toDate) dateObj = rawDate.toDate()
+      else dateObj = new Date(rawDate)
+
+      if (isNaN(dateObj.getTime())) return
+
+      const y = dateObj.getFullYear()
+      const m = dateObj.getMonth() // 0 = Jan, 7 = Aug, 11 = Dec
+
+      // Aug(7) - Dec(11) of selectedYear => idx 0 - 4
+      if (y === selectedYear && m >= 7) {
+        currentMonthlyCounts[m - 7]++
+      }
+      // Jan(0) - Jul(6) of selectedYear + 1 => idx 5 - 11
+      else if (y === selectedYear + 1 && m < 7) {
+        currentMonthlyCounts[m + 5]++
+      }
+    }
+  })
 
   if (loading) {
     return (
@@ -231,44 +251,52 @@ export default function TeacherDashboard({ user }) {
               <div className='flex items-center justify-center gap-5 text-[11px]'>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#6B8E6F]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Excel ({Math.round((stats.distribution.excel / (stats.totalStudents || 1)) * 100)}%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Excellent ({Math.round((stats.distribution.excel / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#A5D6A7]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Satis ({Math.round((stats.distribution.satis / (stats.totalStudents || 1)) * 100)}%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Satisfactory ({Math.round((stats.distribution.satis / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <div className='w-2.5 h-2.5 rounded-full bg-[#FFCDD2]'></div>
-                  <span className='text-[#6B6B6B] font-medium'>Needs ({Math.round((stats.distribution.needs / (stats.totalStudents || 1)) * 100)}%)</span>
+                  <span className='text-[#6B6B6B] font-medium'>Poor ({Math.round((stats.distribution.needs / (stats.totalStudents || 1)) * 100)}%)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Monthly Progress Line Chart */}
+          {/* Monthly Progress Bar Chart */}
           <div className='bg-white rounded-xl p-5 border border-[#E8E8E0] col-span-1 lg:col-span-3'>
-            <div className='flex items-center justify-between mb-5'>
+            <div className='flex items-center justify-between mb-5 flex-wrap gap-2'>
               <h3 className='text-[15px] font-semibold text-[#1F1F1F]'>Monthly Progress</h3>
-              <button className='text-[11px] text-[#6B6B6B] flex items-center gap-1 font-medium hover:text-[#6B8E6F] transition-colors'>
-                This Year
-                <svg className='w-3 h-3' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M19 9l-7 7-7-7' />
-                </svg>
-              </button>
+              <div className='flex items-center gap-2'>
+                <span className='text-[11px] text-[#6B6B6B] font-medium'>Academic Year:</span>
+                <select 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className='bg-[#F8FAF8] border border-[#E8E8E0] rounded-lg px-2.5 py-1 text-[12px] font-bold text-[#1F1F1F] focus:outline-none focus:border-[#6B8E6F] cursor-pointer shadow-sm'
+                >
+                  {[2024, 2025, 2026, 2027, 2028].map(yr => (
+                    <option key={yr} value={yr}>
+                      {yr} - {yr + 1} (Aug - Jul)
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             
-            {/* Dynamic Bar Chart */}
-            <div className='flex items-end justify-between h-44 pb-2 px-2'>
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, idx) => {
-                const count = stats.monthlyData[idx]
-                const max = Math.max(...stats.monthlyData, 1) // prevent div by zero
+            {/* Dynamic Bar Chart Starting From August */}
+            <div className='flex items-end justify-between h-44 pb-2 px-1 gap-1 overflow-x-auto'>
+              {MONTHS_FROM_AUG.map((month, idx) => {
+                const count = currentMonthlyCounts[idx] || 0
+                const max = Math.max(...currentMonthlyCounts, 1)
                 const heightPct = Math.round((count / max) * 100)
                 return (
-                  <div key={month} className='flex flex-col items-center gap-2 h-full justify-end w-full group'>
-                    <span className='text-[10px] text-[#6B6B6B] opacity-0 group-hover:opacity-100 transition-opacity'>{count}</span>
+                  <div key={month} className='flex flex-col items-center gap-1.5 h-full justify-end w-full group min-w-[24px]'>
+                    <span className='text-[10px] text-[#6B6B6B] opacity-0 group-hover:opacity-100 transition-opacity font-bold'>{count}</span>
                     <div 
-                      className='w-1/2 md:w-8 bg-[#6B8E6F] rounded-t-sm transition-all duration-500'
-                      style={{ height: `${heightPct}%`, minHeight: count > 0 ? '4px' : '0' }}
+                      className='w-full max-w-[28px] bg-[#6B8E6F] rounded-t-sm transition-all duration-500 hover:bg-[#4d6d51]'
+                      style={{ height: `${heightPct}%`, minHeight: count > 0 ? '6px' : '0' }}
                     ></div>
                     <span className='text-[11px] text-[#6B6B6B] font-medium'>{month}</span>
                   </div>

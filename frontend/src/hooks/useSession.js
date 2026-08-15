@@ -29,49 +29,62 @@ export function useSession(user, program) {
   useEffect(() => { runCountRef.current = runCount }, [runCount])
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
 
-  // Create Firestore session doc on mount
+  // Create or resume Firestore session doc on mount
   useEffect(() => {
     if (!user || !program) return
-    async function createSession() {
-      const id    = generateSessionId(user.uid, program.id)
-      const start = new Date()
-      setSessionId(id)
-      setSessionStart(start)
-      await setDoc(doc(db, 'sessions', id), {
-        sessionId:    id,
-        studentId:    user.uid,
-        programId:    program.id,
-        programTitle: program.title || '',   // store title so Dashboard shows it immediately
-        startedAt:    serverTimestamp(),
-        status:       'active',
-        finalCode:    program?.starterCode || '',
-        runAttempts:  0,
-        errors:       [],
-        hintsUsed:    0,
-        violations:   [],
-        quizScore:    0,
-        flagged:      false,
-        attemptNumber: 0,
-      })
-
-      // Count prior sessions for this student+program to label this attempt
+    async function initSession() {
       try {
         const { getDocs, collection, query, where } = await import('firebase/firestore')
+        
+        // 1. Query all sessions for this student + program
         const q = query(
           collection(db, 'sessions'),
           where('studentId', '==', user.uid),
           where('programId', '==', program.id)
         )
         const snap = await getDocs(q)
-        // snap includes this new doc, so attemptNumber = snap.size
-        await updateDoc(doc(db, 'sessions', id), {
-          attemptNumber: snap.size,
-        })
+        
+        // 2. Find existing active or in-progress session if student is returning
+        const existingDocs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(s => s.status === 'active' || s.status === 'in_progress' || s.status === 'quiz_pending')
+
+        if (existingDocs.length > 0) {
+          // Pick newest active session
+          const activeSess = existingDocs[0]
+          setSessionId(activeSess.id)
+          if (activeSess.finalCode) setCode(activeSess.finalCode)
+          if (activeSess.runAttempts) setRunCount(activeSess.runAttempts)
+          if (activeSess.errors) setErrors(activeSess.errors)
+          setSessionStart(new Date())
+        } else {
+          // Create new active session doc
+          const id    = generateSessionId(user.uid, program.id)
+          const start = new Date()
+          setSessionId(id)
+          setSessionStart(start)
+          await setDoc(doc(db, 'sessions', id), {
+            sessionId:    id,
+            studentId:    user.uid,
+            programId:    program.id,
+            programTitle: program.title || '',   // store title so Dashboard shows it immediately
+            startedAt:    serverTimestamp(),
+            status:       'active',
+            finalCode:    program?.starterCode || '',
+            runAttempts:  0,
+            errors:       [],
+            hintsUsed:    0,
+            violations:   [],
+            quizScore:    0,
+            flagged:      false,
+            attemptNumber: snap.size + 1,
+          })
+        }
       } catch (e) {
-        console.warn('Could not set attemptNumber:', e)
+        console.warn('Session init error:', e)
       }
     }
-    createSession()
+    initSession()
   }, [user, program])
 
   // Elapsed timer — ticks every second
@@ -102,6 +115,21 @@ export function useSession(user, program) {
     }, 30000)
     return () => clearInterval(interval)
   }, [sessionId])
+
+  // Real-time debounced auto-save (2 seconds after typing) so progress updates dynamically
+  useEffect(() => {
+    if (!sessionId || !code) return
+    const timer = setTimeout(async () => {
+      try {
+        await updateDoc(doc(db, 'sessions', sessionId), {
+          finalCode: codeRef.current,
+        })
+      } catch (err) {
+        // silent background catch
+      }
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [code, sessionId])
 
   // codeSnapshots: array of { attempt, code, stdout, stderr, exitCode, tookMs, timestamp }
   // Kept in a ref so it never causes re-renders; written to Firestore on finalize

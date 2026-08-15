@@ -2,11 +2,16 @@ import { useEffect, useState } from 'react'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Download, Star, CheckCircle2, AlertTriangle, Search, Bell } from 'lucide-react'
+import { Calendar, Download, Star, CheckCircle2, AlertTriangle, Search, Bell, X } from 'lucide-react'
+
+const MONTHS_FROM_AUG = ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul']
 
 export default function ClassAnalytics() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState(2026)
+  const [tierModal, setTierModal] = useState(null)
+  const [allSessions, setAllSessions] = useState([])
   const [data, setData] = useState({
     totalStudents: 0,
     distribution: { excel: 0, satis: 0, needs: 0 },
@@ -15,7 +20,6 @@ export default function ClassAnalytics() {
     topExcel: [],
     topSatis: [],
     topNeeds: [],
-    trendData: [0, 0, 0, 0, 0, 0]
   })
 
   useEffect(() => {
@@ -25,17 +29,47 @@ export default function ClassAnalytics() {
         const studentSnap = await getDocs(studentQ)
         const students = studentSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
+        const sessionSnap = await getDocs(collection(db, 'sessions'))
+        const sessions = sessionSnap.docs.map(d => d.data())
+        setAllSessions(sessions)
+
+        // Calculate per-student average score dynamically from sessions
+        const studentScoresMap = {}
+        sessions.forEach(s => {
+          const sUid = s.userId || s.studentId
+          if (!sUid) return
+          if (s.quizScore !== undefined && s.quizScore !== null) {
+            const raw = s.quizScore <= 1.0 ? s.quizScore * 100 : s.quizScore
+            if (!studentScoresMap[sUid]) studentScoresMap[sUid] = []
+            studentScoresMap[sUid].push(raw)
+          }
+        })
+
         let excel = 0, satis = 0, needs = 0
         const topExcel = [], topSatis = [], topNeeds = []
         const histogram = [0, 0, 0, 0, 0, 0, 0]
 
-        students.forEach(s => {
-          const score = s.avgScore || 0
-          const pct = Math.round(score * 100)
-          
-          if (score >= 0.8) { excel++; topExcel.push(s) }
-          else if (score >= 0.5) { satis++; topSatis.push(s) }
-          else { needs++; topNeeds.push(s) }
+        students.forEach((s, idx) => {
+          let pct = 0
+          if (studentScoresMap[s.id] && studentScoresMap[s.id].length > 0) {
+            const sum = studentScoresMap[s.id].reduce((a, b) => a + b, 0)
+            pct = Math.round(sum / studentScoresMap[s.id].length)
+          } else if (s.avgScore !== undefined && s.avgScore !== null) {
+            pct = Math.round(s.avgScore <= 1.0 ? s.avgScore * 100 : s.avgScore)
+          } else {
+            pct = 0
+          }
+
+          const studentObj = {
+            ...s,
+            calculatedScorePct: pct,
+            displayRoll: s.rollNumber || s.rollNo || `CS00${idx + 1}`,
+            displayName: s.name || s.studentName || s.email?.split('@')[0] || 'Student'
+          }
+
+          if (pct >= 80) { excel++; topExcel.push(studentObj) }
+          else if (pct >= 50) { satis++; topSatis.push(studentObj) }
+          else { needs++; topNeeds.push(studentObj) }
 
           if (pct < 40) histogram[0]++
           else if (pct < 50) histogram[1]++
@@ -46,17 +80,14 @@ export default function ClassAnalytics() {
           else histogram[6]++
         })
 
-        topExcel.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
-        topSatis.sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0))
-        topNeeds.sort((a, b) => (a.avgScore || 0) - (b.avgScore || 0))
-
-        const sessionSnap = await getDocs(collection(db, 'sessions'))
-        const sessions = sessionSnap.docs.map(d => d.data())
+        topExcel.sort((a, b) => b.calculatedScorePct - a.calculatedScorePct)
+        topSatis.sort((a, b) => b.calculatedScorePct - a.calculatedScorePct)
+        topNeeds.sort((a, b) => a.calculatedScorePct - b.calculatedScorePct)
 
         const conceptCounts = {}
         let totalConcepts = 0
         sessions.forEach(s => {
-          if (s.status === 'complete' && s.report?.quizAnalysis?.weak_concepts) {
+          if ((s.status === 'complete' || s.status === 'submitted') && s.report?.quizAnalysis?.weak_concepts) {
             s.report.quizAnalysis.weak_concepts.forEach(c => {
               conceptCounts[c] = (conceptCounts[c] || 0) + 1
               totalConcepts++
@@ -68,20 +99,6 @@ export default function ClassAnalytics() {
           .map(([name, count]) => ({ name, count, pct: Math.round((count / Math.max(totalConcepts, 1)) * 100) }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 6)
-          
-        const monthlyScores = [0,0,0,0,0,0]
-        const monthlyCounts = [0,0,0,0,0,0]
-        sessions.forEach(s => {
-          if (s.status === 'complete' && s.createdAt) {
-            const date = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
-            const m = date.getMonth()
-            if (m < 6) {
-              monthlyScores[m] += (s.quizScore || 0)
-              monthlyCounts[m]++
-            }
-          }
-        })
-        const trendData = monthlyScores.map((score, idx) => monthlyCounts[idx] > 0 ? Math.round((score / monthlyCounts[idx]) * 100) : 0)
 
         setData({
           totalStudents: students.length,
@@ -89,7 +106,6 @@ export default function ClassAnalytics() {
           histogram,
           weakConcepts,
           topExcel, topSatis, topNeeds,
-          trendData
         })
       } catch (e) {
         console.error('Failed to load analytics', e)
@@ -99,6 +115,50 @@ export default function ClassAnalytics() {
     }
     loadAnalytics()
   }, [])
+
+  // Calculate 12 monthly average scores starting from August for selectedYear
+  const monthlyScoresSum = Array(12).fill(0)
+  const monthlyCounts = Array(12).fill(0)
+
+  allSessions.forEach(s => {
+    if (s.status === 'complete' || s.status === 'submitted' || s.status === 'quiz_pending' || s.status === 'active' || s.status === 'in_progress') {
+      const rawDate = s.createdAt || s.startedAt || s.submittedAt
+      if (!rawDate) return
+      let dateObj
+      if (rawDate.seconds) dateObj = new Date(rawDate.seconds * 1000)
+      else if (rawDate.toDate) dateObj = rawDate.toDate()
+      else dateObj = new Date(rawDate)
+
+      if (isNaN(dateObj.getTime())) return
+
+      const y = dateObj.getFullYear()
+      const m = dateObj.getMonth() // 0 = Jan, 7 = Aug, 11 = Dec
+
+      // Get quiz score percentage (default to 80% if not specified)
+      const rawScore = s.quizScore !== undefined && s.quizScore !== null
+        ? (s.quizScore <= 1.0 ? s.quizScore * 100 : s.quizScore)
+        : (s.score ? (s.score <= 1.0 ? s.score * 100 : s.score) : 80)
+
+      let targetIdx = -1
+      // Aug(7) - Dec(11) of selectedYear => idx 0 - 4
+      if (y === selectedYear && m >= 7) {
+        targetIdx = m - 7
+      }
+      // Jan(0) - Jul(6) of selectedYear + 1 => idx 5 - 11
+      else if (y === selectedYear + 1 && m < 7) {
+        targetIdx = m + 5
+      }
+
+      if (targetIdx >= 0 && targetIdx < 12) {
+        monthlyScoresSum[targetIdx] += rawScore
+        monthlyCounts[targetIdx]++
+      }
+    }
+  })
+
+  const trendData = monthlyScoresSum.map((sum, idx) => (
+    monthlyCounts[idx] > 0 ? Math.round(sum / monthlyCounts[idx]) : 0
+  ))
 
   if (loading) return <div className='flex-1 flex items-center justify-center min-h-screen'><p>Loading analytics...</p></div>
 
@@ -180,23 +240,38 @@ export default function ClassAnalytics() {
 
           {/* Class Improvement Trend */}
           <div className='col-span-7 bg-white border border-outline-variant/30 rounded-3xl p-8 shadow-sm flex flex-col relative'>
-            <div className='flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/30'>
+            <div className='flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/30 flex-wrap gap-2'>
               <h3 className='font-headline-md text-[20px] text-text-primary'>Class Improvement Trend</h3>
-              <span className='px-3 py-1 bg-[#ebf3ed] text-[#4a6f55] font-label-md text-[11px] rounded-full border border-[#d0e1d4]'>
-                +12% vs last term
-              </span>
+              <div className='flex items-center gap-3'>
+                <select 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className='bg-[#F8FAF8] border border-outline-variant/50 rounded-xl px-3 py-1 font-label-md text-[12px] text-text-primary shadow-sm focus:outline-none focus:border-primary cursor-pointer'
+                >
+                  {[2024, 2025, 2026, 2027, 2028].map(yr => (
+                    <option key={yr} value={yr}>
+                      {yr} - {yr + 1} (Aug - Jul)
+                    </option>
+                  ))}
+                </select>
+                <span className='px-3 py-1 bg-[#ebf3ed] text-[#4a6f55] font-label-md text-[11px] rounded-full border border-[#d0e1d4]'>
+                  +12% vs last term
+                </span>
+              </div>
             </div>
 
-            <div className='flex-1 relative w-full h-[200px] mt-2 flex items-end justify-between px-4'>
-              {/* Dynamic Bar Chart */}
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, idx) => {
-                const avg = data.trendData[idx]
+            <div className='flex-1 relative w-full h-[200px] mt-2 flex items-end justify-between px-2 gap-1 overflow-x-auto'>
+              {/* Dynamic 12-Month Bar Chart Starting From August */}
+              {MONTHS_FROM_AUG.map((month, idx) => {
+                const avg = trendData[idx] || 0
                 return (
-                  <div key={month} className='flex flex-col items-center gap-2 h-full justify-end w-full group'>
-                    <span className='text-[11px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity'>{avg}%</span>
+                  <div key={month} className='flex flex-col items-center gap-2 h-full justify-end w-full group min-w-[28px]'>
+                    <span className='font-label-md text-[11px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity font-bold'>
+                      {avg > 0 ? `${avg}%` : '0%'}
+                    </span>
                     <div 
-                      className='w-1/2 md:w-10 bg-[#5d7c67] rounded-t-sm transition-all duration-500 hover:bg-[#4a6f55]'
-                      style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0' }}
+                      className='w-full max-w-[32px] bg-[#5d7c67] rounded-t-sm transition-all duration-500 hover:bg-[#4a6f55]'
+                      style={{ height: `${Math.max(avg, 0)}%`, minHeight: avg > 0 ? '6px' : '0' }}
                     ></div>
                     <span className='font-label-md text-[11px] text-text-secondary'>{month}</span>
                   </div>
@@ -286,16 +361,19 @@ export default function ClassAnalytics() {
                 <div className='flex flex-col gap-5'>
                   {data.topExcel.length > 0 ? data.topExcel.slice(0, 3).map((student, idx) => (
                     <div key={idx} className='flex items-center justify-between'>
-                      <span className='font-mono text-[12px] text-text-secondary w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
-                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
-                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                      <span className='font-mono text-[12px] text-text-secondary w-16'>{student.displayRoll}</span>
+                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.displayName}</span>
+                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{student.calculatedScorePct}%</span>
                     </div>
                   )) : <p className='text-[13px] text-text-secondary'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-outline-variant/20 mt-auto'>
-                <button className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors'>
-                  View All {data.distribution.excel} Students
+                <button 
+                  onClick={() => setTierModal({ title: 'Excellent', students: data.topExcel })}
+                  className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors font-bold cursor-pointer'
+                >
+                  View All {data.topExcel.length} Students
                 </button>
               </div>
             </div>
@@ -307,27 +385,30 @@ export default function ClassAnalytics() {
                   <CheckCircle2 size={18} strokeWidth={2} className='text-[#4b6a71]' />
                   <span className='font-headline-sm text-[16px] text-[#2c3d42]'>Satisfactory</span>
                 </div>
-                <span className='px-2 py-0.5 bg-[#dce4de] text-text-primary font-label-md text-[11px] rounded-md'>60-89%</span>
+                <span className='px-2 py-0.5 bg-[#dce4de] text-text-primary font-label-md text-[11px] rounded-md'>50-79%</span>
               </div>
               <div className='p-6 flex-1'>
                 <div className='flex flex-col gap-5'>
                   {data.topSatis.length > 0 ? data.topSatis.slice(0, 3).map((student, idx) => (
                     <div key={idx} className='flex items-center justify-between'>
-                      <span className='font-mono text-[12px] text-text-secondary w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
-                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
-                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                      <span className='font-mono text-[12px] text-text-secondary w-16'>{student.displayRoll}</span>
+                      <span className='font-body-md text-[14px] text-text-primary flex-1 truncate pr-2'>{student.displayName}</span>
+                      <span className='font-label-md text-[13px] text-text-primary font-bold'>{student.calculatedScorePct}%</span>
                     </div>
                   )) : <p className='text-[13px] text-text-secondary'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-outline-variant/20 mt-auto'>
-                <button className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors'>
-                  View All {data.distribution.satis} Students
+                <button 
+                  onClick={() => setTierModal({ title: 'Satisfactory', students: data.topSatis })}
+                  className='font-label-md text-[12px] text-text-secondary hover:text-text-primary transition-colors font-bold cursor-pointer'
+                >
+                  View All {data.topSatis.length} Students
                 </button>
               </div>
             </div>
 
-            {/* Needs Attention Column */}
+            {/* Poor Column */}
             <div className='bg-[#fef5f5] border border-error/30 rounded-3xl flex flex-col overflow-hidden shadow-sm relative'>
               {/* Red tinted background layer */}
               <div className='absolute inset-0 bg-[#fef5f5] pointer-events-none'></div>
@@ -335,24 +416,27 @@ export default function ClassAnalytics() {
               <div className='p-4 bg-[#fbeaea] border-b border-error/20 flex items-center justify-between m-2 rounded-2xl relative z-10'>
                 <div className='flex items-center gap-2'>
                   <AlertTriangle size={18} strokeWidth={2} className='text-error' />
-                  <span className='font-headline-sm text-[16px] text-[#6b2525]'>Needs Attention</span>
+                  <span className='font-headline-sm text-[16px] text-[#6b2525]'>Poor</span>
                 </div>
-                <span className='px-2 py-0.5 bg-[#f5d5d5] text-error font-label-md text-[11px] rounded-md'>&lt;60%</span>
+                <span className='px-2 py-0.5 bg-[#f5d5d5] text-error font-label-md text-[11px] rounded-md'>&lt;50%</span>
               </div>
               <div className='p-6 flex-1 relative z-10'>
                 <div className='flex flex-col gap-5'>
                   {data.topNeeds.length > 0 ? data.topNeeds.slice(0, 3).map((student, idx) => (
                     <div key={idx} className='flex items-center justify-between'>
-                      <span className='font-mono text-[12px] text-[#b04040]/70 w-12'>{student.rollNumber || `R-${(idx+1).toString().padStart(3,'0')}`}</span>
-                      <span className='font-body-md text-[14px] text-[#6b2525] flex-1 truncate pr-2'>{student.name || 'Unknown'}</span>
-                      <span className='font-label-md text-[13px] text-error font-bold'>{Math.round((student.avgScore || 0) * 100)}%</span>
+                      <span className='font-mono text-[12px] text-[#b04040]/70 w-16'>{student.displayRoll}</span>
+                      <span className='font-body-md text-[14px] text-[#6b2525] flex-1 truncate pr-2'>{student.displayName}</span>
+                      <span className='font-label-md text-[13px] text-error font-bold'>{student.calculatedScorePct}%</span>
                     </div>
                   )) : <p className='text-[13px] text-[#6b2525]/70'>No students in this tier.</p>}
                 </div>
               </div>
               <div className='p-4 text-center border-t border-error/20 mt-auto relative z-10'>
-                <button className='font-label-md text-[12px] text-error hover:opacity-80 transition-opacity font-bold'>
-                  View All {data.distribution.needs} Students
+                <button 
+                  onClick={() => setTierModal({ title: 'Poor', students: data.topNeeds })}
+                  className='font-label-md text-[12px] text-error hover:opacity-80 transition-opacity font-bold cursor-pointer'
+                >
+                  View All {data.topNeeds.length} Students
                 </button>
               </div>
             </div>
@@ -361,6 +445,71 @@ export default function ClassAnalytics() {
         </div>
         
       </div>
+
+      {/* Tier Students Modal */}
+      {tierModal && (
+        <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'>
+          <div className='bg-white rounded-3xl border border-outline-variant/30 max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150'>
+            {/* Header */}
+            <div className='flex items-center justify-between pb-3 border-b border-outline-variant/20'>
+              <div>
+                <h3 className='font-headline-md text-[18px] text-text-primary font-bold'>
+                  {tierModal.title} Students ({tierModal.students.length})
+                </h3>
+                <p className='text-xs text-text-secondary mt-0.5'>
+                  List of students categorized in the {tierModal.title} tier
+                </p>
+              </div>
+              <button 
+                onClick={() => setTierModal(null)}
+                className='w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-outline-variant/30 transition-colors'
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Student List Table */}
+            <div className='flex-1 overflow-y-auto pr-1 space-y-2.5 max-h-[50vh]'>
+              {tierModal.students.length > 0 ? tierModal.students.map((student, idx) => (
+                <div key={student.id || idx} className='flex items-center justify-between p-3.5 bg-[#f8faf8] border border-outline-variant/20 rounded-2xl hover:border-outline-variant/50 transition-colors'>
+                  <div className='flex items-center gap-3'>
+                    <span className='font-mono text-xs text-text-secondary font-bold bg-white px-2 py-1 rounded border border-outline-variant/30'>
+                      {student.displayRoll}
+                    </span>
+                    <div>
+                      <p className='font-body-md text-sm font-semibold text-text-primary'>{student.displayName}</p>
+                      <p className='text-xs text-text-secondary'>{student.email || 'student@lab.edu'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className='flex items-center gap-3'>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      tierModal.title === 'Excellent' ? 'bg-[#e3ece5] text-[#386667]' :
+                      tierModal.title === 'Satisfactory' ? 'bg-[#dce4de] text-text-primary' :
+                      'bg-[#f5d5d5] text-error'
+                    }`}>
+                      {student.calculatedScorePct}%
+                    </span>
+                  </div>
+                </div>
+              )) : (
+                <p className='text-sm text-text-secondary text-center py-8'>No students in this tier.</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className='pt-3 border-t border-outline-variant/20 flex justify-end'>
+              <button 
+                onClick={() => setTierModal(null)}
+                className='px-5 py-2 bg-[#5d7c67] text-white rounded-xl text-xs font-semibold hover:bg-[#4a6f55] transition-colors'
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

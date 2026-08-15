@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   collection, query, where, getDocs,
-  doc, getDoc, addDoc, serverTimestamp,
+  doc, getDoc, addDoc, serverTimestamp, onSnapshot,
 } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useNavigate } from 'react-router-dom'
@@ -56,70 +56,80 @@ export default function ProgramLibrary() {
   }, [user?.uid])
 
   useEffect(() => {
+    let sessUnsub = () => {}
+
     async function loadPrograms() {
       const userSnap  = await getDoc(doc(db, 'users', user.uid))
       const userClassId = userSnap.data()?.classId
       setClassId(userClassId)
 
-      if (!userClassId) { setLoading(false); return }
+      const progQuery = userClassId
+        ? query(collection(db, 'programs'), where('active', '==', true), where('classId', '==', userClassId))
+        : query(collection(db, 'programs'), where('active', '==', true))
 
-      const q = query(
-        collection(db, 'programs'),
-        where('active',  '==', true),
-        where('classId', '==', userClassId)
-      )
-      const snap     = await getDocs(q)
+      const snap = await getDocs(progQuery)
       const programs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
       setAllPrograms(programs)
 
-      if (programs.length > 0) {
-        try {
-          const sessQ = query(
-            collection(db, 'sessions'),
-            where('studentId', '==', user.uid)
-          )
-          const sessSnap = await getDocs(sessQ)
+      // Real-time Firestore session listener
+      const sessQ = query(
+        collection(db, 'sessions'),
+        where('studentId', '==', user.uid)
+      )
 
-          const counts    = {}
-          const completed = new Set()
-          const active    = new Set()
-          const progress  = {}
+      sessUnsub = onSnapshot(sessQ, (sessSnap) => {
+        const counts    = {}
+        const completed = new Set()
+        const active    = new Set()
+        const progress  = {}
 
-          sessSnap.docs.forEach(d => {
-            const s   = d.data()
-            const pid = s.programId
-            if (!pid) return
+        sessSnap.docs.forEach(d => {
+          const s   = d.data()
+          const pid = s.programId
+          if (!pid) return
+          
+          counts[pid] = (counts[pid] || 0) + 1
+          if (s.status === 'complete' || s.status === 'submitted') {
+            completed.add(pid)
+          } else if (s.status === 'active' || s.status === 'quiz_pending' || s.status === 'in_progress') {
+            active.add(pid)
             
-            counts[pid] = (counts[pid] || 0) + 1
-            if (s.status === 'complete') completed.add(pid)
-            if (s.status === 'active' || s.status === 'quiz_pending') {
-              active.add(pid)
-              
-              // Calculate real progress based on test cases passed or runs
-              let pct = 0
-              if (s.lastTestResults && s.lastTestResults.totalCount > 0) {
-                 pct = Math.round((s.lastTestResults.passedCount / s.lastTestResults.totalCount) * 100)
-              } else if (s.runAttempts > 0) {
-                 pct = 10 // At least 10% for trying
-              }
-              // Store highest progress if multiple active sessions
-              progress[pid] = Math.max(progress[pid] || 0, pct)
+            // Calculate real progress based on test cases passed or runs
+            let pct = 0
+            if (s.lastTestResults && s.lastTestResults.totalCount > 0) {
+               pct = Math.round((s.lastTestResults.passedCount / s.lastTestResults.totalCount) * 100)
+            } else if (s.runAttempts > 0) {
+               pct = 10 // At least 10% for trying
             }
-          })
 
-          setAttemptCounts(counts)
-          setCompletedPrograms(completed)
-          setActivePrograms(active)
-          setProgramProgress(progress)
-        } catch (e) {
-          console.warn('Could not load attempt counts:', e)
-        }
-      }
+            // Calculate progress from student writing code (at least 2 lines = 5% progress)
+            const codeText = s.finalCode || s.currentCode || ''
+            const nonBlankLines = codeText.split('\n').filter(line => line.trim().length > 0)
+            if (nonBlankLines.length >= 2) {
+               // At least 5% for 2 lines of code, scaling up to 25% with lines written
+               const lineProgress = Math.min(25, 3 + (nonBlankLines.length * 2))
+               pct = Math.max(pct, lineProgress)
+            }
+
+            // Store highest progress if multiple active sessions
+            progress[pid] = Math.max(progress[pid] || 0, pct)
+          }
+        })
+
+        setAttemptCounts(counts)
+        setCompletedPrograms(completed)
+        setActivePrograms(active)
+        setProgramProgress(progress)
+      }, (err) => {
+        console.warn('Real-time session snapshot error:', err)
+      })
 
       setLoading(false)
     }
     loadPrograms()
+
+    return () => sessUnsub()
   }, [user.uid])
 
   const subjects = ['All', ...new Set(allPrograms.map(p => p.subject || 'General'))]

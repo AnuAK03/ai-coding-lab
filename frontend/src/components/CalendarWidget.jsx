@@ -1,24 +1,124 @@
 // frontend/src/components/CalendarWidget.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { getAuth } from 'firebase/auth';
 
-export default function CalendarWidget() {
+export default function CalendarWidget({ userId }) {
+  const authUser = getAuth().currentUser;
+  const activeUserId = userId || authUser?.uid;
+
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [activityMap, setActivityMap] = useState({});
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth(); // 0 - 11
   const today = new Date();
-  const currentMonth = today.toLocaleString('default', { month: 'short' });
-  const currentYear = today.getFullYear();
-  const currentDate = today.getDate();
+  const isCurrentMonthView = today.getFullYear() === year && today.getMonth() === month;
+  const actualTodayDate = today.getDate();
 
+  const monthName = currentDate.toLocaleString('default', { month: 'short' });
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  
-  // Dummy data for calendar days (just mock it for aesthetic)
-  const calendarDays = [
-    { date: 29, isPrevMonth: true }, { date: 30, isPrevMonth: true }, 
-    { date: 1 }, { date: 2 }, { date: 3, dots: 1 }, { date: 4, dots: 2 }, { date: 5 },
-    { date: 6 }, { date: 7 }, { date: 8 }, { date: 9 }, { date: 10, dots: 2 }, { date: 11 }, { date: 12 },
-    { date: 13 }, { date: 14, dots: 2 }, { date: 15, dots: 2 }, { date: 16, isCurrent: true }, { date: 17 }, { date: 18 }, { date: 19 },
-    { date: 20 }, { date: 21, dots: 2 }, { date: 22, dots: 2 }, { date: 23 }, { date: 24 }, { date: 25 }, { date: 26 },
-    { date: 27 }, { date: 28 }, { date: 29 }, { date: 30 }, { date: 31 }, { date: 1, isNextMonth: true }, { date: 2, isNextMonth: true }
-  ];
+
+  // Real-time Firestore session listener for calendar dots
+  useEffect(() => {
+    if (!activeUserId) return;
+
+    const q = query(
+      collection(db, 'sessions'),
+      where('studentId', '==', activeUserId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const counts = {};
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        const rawDate = data.startedAt || data.submittedAt;
+        if (rawDate) {
+          let dateObj;
+          if (rawDate.seconds) {
+            dateObj = new Date(rawDate.seconds * 1000);
+          } else if (rawDate.toDate) {
+            dateObj = rawDate.toDate();
+          } else {
+            dateObj = new Date(rawDate);
+          }
+          if (!isNaN(dateObj.getTime())) {
+            const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+            counts[dateStr] = (counts[dateStr] || 0) + 1;
+          }
+        }
+      });
+      setActivityMap(counts);
+    }, (err) => {
+      console.warn('CalendarWidget session listener error:', err);
+    });
+
+    return () => unsubscribe();
+  }, [activeUserId]);
+
+  // Navigate months
+  const prevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  // Build real calendar grid
+  const buildCalendarDays = () => {
+    const days = [];
+
+    // First day of current month (Mon = 0, Sun = 6)
+    const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    // 1. Previous month trailing days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      days.push({
+        date: daysInPrevMonth - i,
+        isPrevMonth: true,
+        isCurrent: false,
+        dots: 0,
+      });
+    }
+
+    // 2. Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const mStr = String(month + 1).padStart(2, '0');
+      const dStr = String(day).padStart(2, '0');
+      const dateKey = `${year}-${mStr}-${dStr}`;
+      const count = activityMap[dateKey] || 0;
+      const isToday = isCurrentMonthView && day === actualTodayDate;
+
+      days.push({
+        date: day,
+        isPrevMonth: false,
+        isNextMonth: false,
+        isCurrent: isToday,
+        dots: Math.min(2, count),
+      });
+    }
+
+    // 3. Next month leading days to complete grid rows
+    const totalSlots = Math.ceil(days.length / 7) * 7;
+    const remainingSlots = totalSlots - days.length;
+    for (let i = 1; i <= remainingSlots; i++) {
+      days.push({
+        date: i,
+        isNextMonth: true,
+        isCurrent: false,
+        dots: 0,
+      });
+    }
+
+    return days;
+  };
+
+  const calendarDays = buildCalendarDays();
 
   return (
     <div className='bg-white rounded-[24px] p-6 border border-outline-variant/30 shadow-sm flex flex-col h-full'>
@@ -27,13 +127,13 @@ export default function CalendarWidget() {
       </div>
       
       <div className='flex items-center justify-between mb-4 px-2'>
-        <button className='text-gray-400 hover:text-gray-700 transition-colors'>
+        <button onClick={prevMonth} className='text-gray-400 hover:text-gray-700 transition-colors p-1'>
           <ChevronLeft size={16} />
         </button>
         <span className='text-[13px] font-bold text-gray-700 tracking-wide'>
-          {currentMonth} {currentYear}
+          {monthName} {year}
         </span>
-        <button className='text-gray-400 hover:text-gray-700 transition-colors'>
+        <button onClick={nextMonth} className='text-gray-400 hover:text-gray-700 transition-colors p-1'>
           <ChevronRight size={16} />
         </button>
       </div>
@@ -52,7 +152,7 @@ export default function CalendarWidget() {
             <div 
               className={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-medium transition-all
                 ${dayObj.isPrevMonth || dayObj.isNextMonth ? 'text-gray-300' : 'text-gray-600'}
-                ${dayObj.isCurrent ? 'bg-[#73b694] text-white shadow-sm' : 'hover:bg-gray-100 cursor-pointer'}
+                ${dayObj.isCurrent ? 'bg-[#73b694] text-white shadow-sm font-bold' : 'hover:bg-gray-100 cursor-pointer'}
               `}
             >
               {dayObj.date}

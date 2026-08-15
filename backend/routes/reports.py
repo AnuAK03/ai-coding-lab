@@ -281,3 +281,212 @@ def get_student_timeline(student_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get('/reports/program/{program_id}/submissions')
+def get_program_submissions_report(program_id: str):
+    """
+    Comprehensive program submission report for teacher dashboard.
+    Returns:
+    1. Submitted count vs Not submitted count
+    2. DICE model evaluation per submitted student (performance tier,
+       quiz score, hint count, violation time/type breakdown, DICE feedback, Groq summary)
+    3. Not-submitted students list with their status
+    """
+    db = firestore.client()
+    try:
+        # 1. Fetch Program Metadata
+        prog_doc = db.collection('programs').document(program_id).get()
+        if not prog_doc.exists:
+            raise HTTPException(status_code=404, detail='Program not found')
+        
+        prog_data = prog_doc.to_dict()
+        class_id = prog_data.get('classId')
+
+        # 2. Fetch Students in Target Class (or all students if classId not specified)
+        students = []
+        if class_id:
+            student_docs = db.collection('users').where('role', '==', 'student').where('classId', '==', class_id).get()
+            students = [{'id': doc.id, **doc.to_dict()} for doc in student_docs]
+        
+        # Fallback if no students found by classId
+        if not students:
+            all_student_docs = db.collection('users').where('role', '==', 'student').get()
+            students = [{'id': doc.id, **doc.to_dict()} for doc in all_student_docs]
+
+        # 3. Fetch All Sessions for this Program
+        sessions = db.collection('sessions').where('programId', '==', program_id).get()
+        
+        # Map sessions by studentId
+        student_sessions = {}
+        for s in sessions:
+            s_data = s.to_dict()
+            sid = s_data.get('studentId')
+            if sid:
+                if sid not in student_sessions:
+                    student_sessions[sid] = []
+                student_sessions[sid].append({'id': s.id, **s_data})
+
+        # Try to import predict_and_explain for on-the-fly DICE computation if needed
+        predict_fn = None
+        try:
+            from ml.model import predict_and_explain
+            predict_fn = predict_and_explain
+        except Exception as e:
+            print(f"[Warning] ML model import failed in reports route: {e}")
+
+        submitted_students = []
+        not_submitted_students = []
+
+        performance_distribution = {'excellent': 0, 'satisfactory': 0, 'needs_attention': 0}
+        total_violations_count = 0
+        violation_breakdown = {}
+        quiz_scores = []
+
+        # Process each student
+        for st in students:
+            sid = st['id']
+            st_name = st.get('name', 'Unknown Student')
+            st_roll = st.get('rollNumber', st.get('roll_number', '—'))
+            st_email = st.get('email', '')
+
+            s_list = student_sessions.get(sid, [])
+            # Find submitted/completed session first
+            submitted_sess = next((s for s in s_list if s.get('status') in ['complete', 'submitted']), None)
+
+            if submitted_sess:
+                report = submitted_sess.get('report', {})
+                
+                # If report missing, generate DICE evaluation dynamically
+                if not report and predict_fn:
+                    try:
+                        report = predict_fn(submitted_sess)
+                        db.collection('sessions').document(submitted_sess['id']).update({'report': report})
+                    except Exception as err:
+                        print(f"Dynamic DICE eval failed: {err}")
+                        report = {}
+
+                tier = report.get('performanceTier') or 'satisfactory'
+                if tier in performance_distribution:
+                    performance_distribution[tier] += 1
+                else:
+                    performance_distribution['satisfactory'] += 1
+
+                qs = submitted_sess.get('quizScore', 0)
+                if isinstance(qs, (int, float)):
+                    quiz_scores.append(qs)
+
+                violations = submitted_sess.get('violations', [])
+                total_violations_count += len(violations)
+
+                for v in violations:
+                    vtype = v.get('type', 'unknown') if isinstance(v, dict) else str(v)
+                    violation_breakdown[vtype] = violation_breakdown.get(vtype, 0) + 1
+
+                submitted_students.append({
+                    'studentId': sid,
+                    'studentName': st_name,
+                    'rollNumber': st_roll,
+                    'email': st_email,
+                    'sessionId': submitted_sess['id'],
+                    'status': submitted_sess.get('status', 'complete'),
+                    'startedAt': str(submitted_sess.get('startedAt', '')),
+                    'submittedAt': str(submitted_sess.get('updatedAt', submitted_sess.get('startedAt', ''))),
+                    'performanceTier': tier,
+                    'quizScore': round(qs * 100) if qs <= 1.0 else round(qs),
+                    'hintsUsed': submitted_sess.get('hintsUsed', 0),
+                    'runAttempts': submitted_sess.get('runAttempts', 0),
+                    'timeTakenMs': submitted_sess.get('timeTakenMs', 0),
+                    'violationCount': len(violations),
+                    'violations': violations,
+                    'diceChanges': report.get('diceChanges', []),
+                    'teacherSummary': report.get('teacherSummary', ''),
+                    'dominantWeakness': report.get('dominantWeakness', ''),
+                    'quizAnalysis': report.get('quizAnalysis', {}),
+                    'errorTags': report.get('errorTags', {}),
+                    'flagged': submitted_sess.get('flagged', False),
+                    'submitted': True
+                })
+            else:
+                # Student has not submitted
+                in_prog = next((s for s in s_list if s.get('status') == 'in_progress'), None)
+                status_str = 'in_progress' if in_prog else 'not_started'
+                
+                not_submitted_students.append({
+                    'studentId': sid,
+                    'studentName': st_name,
+                    'rollNumber': st_roll,
+                    'email': st_email,
+                    'status': status_str,
+                    'lastActive': str(in_prog.get('startedAt', '')) if in_prog else '—',
+                    'submitted': False
+                })
+
+        submitted_count = len(submitted_students)
+        not_submitted_count = len(not_submitted_students)
+        total_students = len(students)
+        sub_rate = round((submitted_count / total_students * 100), 1) if total_students > 0 else 0.0
+        avg_quiz = round(sum(quiz_scores) / len(quiz_scores) * 100, 1) if quiz_scores else (
+            round(sum(quiz_scores) / len(quiz_scores), 1) if quiz_scores else 0
+        )
+
+        return {
+            'program': {
+                'id': program_id,
+                'title': prog_data.get('title', 'Program'),
+                'classId': class_id or 'General',
+                'subject': prog_data.get('subject', 'General'),
+                'difficulty': prog_data.get('difficulty', 'easy'),
+                'description': prog_data.get('description', '')
+            },
+            'summary': {
+                'totalStudents': total_students,
+                'submittedCount': submitted_count,
+                'notSubmittedCount': not_submitted_count,
+                'submissionRate': sub_rate,
+                'averageQuizScore': avg_quiz,
+                'performanceDistribution': performance_distribution,
+                'totalViolations': total_violations_count,
+                'violationBreakdown': violation_breakdown
+            },
+            'submittedStudents': submitted_students,
+            'notSubmittedStudents': not_submitted_students
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post('/reports/program/{program_id}/generate')
+def generate_program_reports(program_id: str):
+    """
+    Triggers DICE model evaluation on-demand for all submitted sessions of a program.
+    """
+    db = firestore.client()
+    try:
+        sessions = db.collection('sessions').where('programId', '==', program_id).get()
+        submitted = [s for s in sessions if s.to_dict().get('status') in ['submitted', 'complete']]
+
+        try:
+            from jobs.pipeline import run_pipeline
+            processed_count = 0
+            for doc in submitted:
+                run_pipeline(doc.id)
+                processed_count += 1
+            return {'status': 'ok', 'message': f'DICE evaluation pipeline executed for {processed_count} session(s).'}
+        except Exception as err:
+            # Fallback to model predict_and_explain
+            from ml.model import predict_and_explain
+            processed_count = 0
+            for doc in submitted:
+                s_data = doc.to_dict()
+                rep = predict_and_explain(s_data)
+                db.collection('sessions').document(doc.id).update({'report': rep, 'status': 'complete'})
+                processed_count += 1
+            return {'status': 'ok', 'message': f'DICE model evaluated for {processed_count} session(s).'}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

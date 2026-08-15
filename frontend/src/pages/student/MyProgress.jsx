@@ -2,7 +2,7 @@
 // Student self-analysis: error patterns, quiz concepts, time trends, improvement tips
 
 import { useEffect, useState } from 'react'
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useNavigate } from 'react-router-dom'
@@ -18,31 +18,46 @@ import sessionBanner from '../../assets/session_history_banner.png'
 export default function MyProgress() {
   const [sessions,  setSessions]  = useState([])
   const [programs,  setPrograms]  = useState({})
+  const [profile,   setProfile]   = useState(null)
   const [loading,   setLoading]   = useState(true)
   const { theme } = useTheme()
   const navigate = useNavigate()
   const user = getAuth().currentUser
 
   useEffect(() => {
-    async function load() {
-      if (!user) return
+    if (!user?.uid) return
 
-      // Fetch all programs for title lookup
-      const progSnap = await getDocs(collection(db, 'programs'))
-      const progMap  = {}
+    // 1. Fetch programs lookup once
+    getDocs(collection(db, 'programs')).then(progSnap => {
+      const progMap = {}
       progSnap.docs.forEach(d => { progMap[d.id] = { id: d.id, ...d.data() } })
       setPrograms(progMap)
+    })
 
-      // Fetch all sessions for this student
-      const q    = query(collection(db, 'sessions'), where('studentId', '==', user.uid))
-      const snap = await getDocs(q)
+    // 2. Real-time user profile listener
+    const userUnsub = onSnapshot(doc(db, 'users', user.uid), (uSnap) => {
+      if (uSnap.exists()) {
+        setProfile(uSnap.data())
+      }
+    })
+
+    // 3. Real-time sessions listener
+    const sessQ = query(collection(db, 'sessions'), where('studentId', '==', user.uid))
+    const sessUnsub = onSnapshot(sessQ, (snap) => {
       const data = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.startedAt?.seconds || 0) - (a.startedAt?.seconds || 0)) // Sort newest first
+        .sort((a, b) => (b.startedAt?.seconds || 0) - (a.startedAt?.seconds || 0))
       setSessions(data)
       setLoading(false)
+    }, (err) => {
+      console.warn('Real-time sessions snapshot error:', err)
+      setLoading(false)
+    })
+
+    return () => {
+      userUnsub()
+      sessUnsub()
     }
-    load()
   }, [user?.uid])
 
   if (loading) return (
@@ -51,33 +66,74 @@ export default function MyProgress() {
     </div>
   )
 
-  // ── Compute analytics ────────────────────────────────────────
-  const completed = sessions.filter(s => s.status === 'complete')
-  const inProgress = sessions.filter(s => s.status === 'active' || s.status === 'quiz_pending')
-  const pending = sessions.filter(s => s.status === 'pending')
+  // ── Real-time Analytics Calculations ───────────────────────────
+  const completed = sessions.filter(s => s.status === 'complete' || s.status === 'submitted')
+  const inProgress = sessions.filter(s => s.status === 'active' || s.status === 'quiz_pending' || s.status === 'in_progress')
+  const pending = sessions.filter(s => !s.status || s.status === 'pending')
 
   const totalAttempts = sessions.length
   const completedCount = completed.length
 
-  // Simulated metrics
-  const totalPoints = completedCount * 850 + 1250 // Base points to look good
-  const creditsEarned = completedCount * 5 + 15
+  // Dynamic calculated points & metrics
+  const now = new Date()
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  // Points from completed sessions (quizScore * 1000)
+  const completedPoints = completed.reduce((sum, s) => {
+    const rawScore = s.quizScore !== undefined ? (s.quizScore <= 1.0 ? s.quizScore : s.quizScore / 100) : 0.8
+    return sum + Math.round(rawScore * 1000)
+  }, 0)
+
+  // Points from in-progress sessions (100 pts per active session)
+  const inProgressPoints = inProgress.length * 100
+
+  const userStreak = profile?.streak || 0
+  const streakBonus = userStreak * 50
+
+  const totalPoints = completedPoints + inProgressPoints + streakBonus
+
+  // Points earned in the last 7 days
+  const pointsThisWeek = sessions.reduce((sum, s) => {
+    const rawDate = s.startedAt || s.submittedAt
+    if (!rawDate) return sum
+    let dateObj
+    if (rawDate.seconds) dateObj = new Date(rawDate.seconds * 1000)
+    else if (rawDate.toDate) dateObj = rawDate.toDate()
+    else dateObj = new Date(rawDate)
+    
+    if (dateObj >= sevenDaysAgo) {
+      if (s.status === 'complete' || s.status === 'submitted') {
+        const rawScore = s.quizScore !== undefined ? (s.quizScore <= 1.0 ? s.quizScore : s.quizScore / 100) : 0.8
+        return sum + Math.round(rawScore * 1000)
+      } else {
+        return sum + 100
+      }
+    }
+    return sum
+  }, 0)
+
+  // Credits earned
+  const creditsEarned = completedCount * 10 + Math.floor(totalPoints / 250)
+  const levelText = creditsEarned >= 50 ? 'Master Level' : (creditsEarned >= 20 ? 'Intermediate Level' : 'Novice Coder')
   
-  const avgScore = completed.length > 0
-    ? Math.round((completed.reduce((sum, s) => sum + (s.quizScore || 0), 0) / completed.length) * 100)
-    : 0
+  // Avg score
+  const scoresList = completed.map(s => s.quizScore).filter(score => score !== undefined && score !== null)
+  const avgScore = scoresList.length > 0
+    ? Math.round(scoresList.reduce((sum, score) => sum + (score <= 1.0 ? score * 100 : score), 0) / scoresList.length)
+    : (profile?.avgScore ? Math.round(profile.avgScore * (profile.avgScore <= 1.0 ? 100 : 1)) : 0)
 
-  const bestStreak = completedCount > 0 ? 14 : 0
+  // Best streak
+  const bestStreak = Math.max(userStreak, profile?.bestStreak || 0, completedCount > 0 ? 1 : 0)
 
-  // Status Breakdown Data
+  // Real Status Breakdown Data
   const completedPct = totalAttempts > 0 ? Math.round((completed.length / totalAttempts) * 100) : 0
   const inProgressPct = totalAttempts > 0 ? Math.round((inProgress.length / totalAttempts) * 100) : 0
-  const pendingPct = totalAttempts > 0 ? Math.round((pending.length / totalAttempts) * 100) : 0
+  const pendingPct = totalAttempts > 0 ? Math.max(0, 100 - completedPct - inProgressPct) : 0
 
   const pieData = [
-    { name: 'Completed', value: completedPct || 65, color: '#4a6f55' },
-    { name: 'In Progress', value: inProgressPct || 20, color: '#fbcfe8' },
-    { name: 'Pending', value: pendingPct || 15, color: '#e5e7eb' },
+    { name: 'Completed', value: completedPct, color: '#4a6f55' },
+    { name: 'In Progress', value: inProgressPct, color: '#fbcfe8' },
+    { name: 'Pending', value: pendingPct, color: '#e5e7eb' },
   ]
 
   // Helper for formatting duration
@@ -93,22 +149,22 @@ export default function MyProgress() {
   // Helper for formatting date
   const formatDate = (timestamp) => {
     if (!timestamp) return '--'
-    const d = new Date(timestamp.seconds * 1000)
+    const d = new Date(timestamp.seconds ? timestamp.seconds * 1000 : timestamp)
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
   const renderStatusPill = (status) => {
-    if (status === 'complete') {
+    if (status === 'complete' || status === 'submitted') {
       return <span className='bg-[#4a6f55] text-white text-[11px] px-3 py-1 rounded-full font-medium'>Completed</span>
     }
-    if (status === 'active' || status === 'quiz_pending') {
+    if (status === 'active' || status === 'quiz_pending' || status === 'in_progress') {
       return <span className='bg-[#fbcfe8] text-[#be185d] text-[11px] px-3 py-1 rounded-full font-medium'>In Progress</span>
     }
     return <span className='bg-gray-200 text-gray-600 text-[11px] px-3 py-1 rounded-full font-medium'>Pending</span>
   }
 
   const renderActionButton = (session) => {
-    if (session.status === 'complete') {
+    if (session.status === 'complete' || session.status === 'submitted') {
       return (
         <button 
           onClick={() => navigate(`/student/report/${session.id}`)}
@@ -118,22 +174,12 @@ export default function MyProgress() {
         </button>
       )
     }
-    if (session.status === 'active' || session.status === 'quiz_pending') {
-      return (
-        <button 
-          onClick={() => navigate(`/student/session/${session.programId}`)}
-          className='bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-[11px] font-semibold px-4 py-1.5 rounded-lg transition-colors'
-        >
-          Continue
-        </button>
-      )
-    }
     return (
       <button 
         onClick={() => navigate(`/student/session/${session.programId}`)}
         className='bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-[11px] font-semibold px-4 py-1.5 rounded-lg transition-colors'
       >
-        Start
+        Continue
       </button>
     )
   }
@@ -141,12 +187,10 @@ export default function MyProgress() {
   return (
     <div className={`min-h-screen bg-[#fcfaf5] text-[#171717] pb-12`}>
 
-
       <div className='max-w-[1200px] mx-auto px-8 space-y-6 pt-8'>
         
         {/* Banner Section */}
         <div className='bg-[#fcfaf5] border border-outline-variant/30 rounded-[20px] p-8 relative overflow-hidden shadow-sm'>
-           {/* Subtle dotted background pattern */}
            <div className='absolute inset-0 opacity-[0.03] pointer-events-none' 
                 style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
            </div>
@@ -180,7 +224,7 @@ export default function MyProgress() {
                     <p className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2'>Total Points</p>
                     <p className='text-3xl font-bold text-[#4a6f55] mb-2'>{totalPoints.toLocaleString()}</p>
                     <p className='text-[11px] font-semibold text-gray-500 flex items-center gap-1'>
-                       <TrendingUp size={12} className='text-green-600' /> +340 this week
+                       <TrendingUp size={12} className='text-green-600' /> +{pointsThisWeek.toLocaleString()} this week
                     </p>
                  </div>
 
@@ -189,7 +233,7 @@ export default function MyProgress() {
                     <p className='text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2'>Credits Earned</p>
                     <p className='text-3xl font-bold text-[#4a6f55] mb-2'>{creditsEarned}</p>
                     <p className='text-[11px] font-semibold text-gray-500 flex items-center gap-1'>
-                       <Award size={12} /> Master Level
+                       <Award size={12} /> {levelText}
                     </p>
                  </div>
 
@@ -209,7 +253,7 @@ export default function MyProgress() {
                        {bestStreak} <span className='text-sm font-normal text-gray-500'>days</span>
                     </p>
                     <p className='text-[11px] font-semibold text-gray-500 flex items-center gap-1'>
-                       <Zap size={12} /> Active now
+                       <Zap size={12} /> {bestStreak > 0 ? 'Active now' : 'Start today'}
                     </p>
                  </div>
               </div>

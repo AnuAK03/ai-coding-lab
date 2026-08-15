@@ -2,7 +2,7 @@
 // CodeLab Student Dashboard (Stitch Theme)
 
 import { useEffect, useState, useRef } from 'react'
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, collection, query, where, onSnapshot } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../../services/firebase'
 import StreakHeatmap from '../../components/StreakHeatmap'
@@ -40,44 +40,44 @@ export default function StudentDashboard({ user }) {
     return () => mediaQuery.removeEventListener('change', handler)
   }, [])
 
-  // Load profile
+  // Real-time listener for user profile and completed sessions
   useEffect(() => {
-    async function loadProfile() {
-      const snap = await getDoc(doc(db, 'users', user.uid))
+    if (!user?.uid) return
+
+    // 1. Real-time user profile listener (streak, badges)
+    const userUnsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) {
         setProfile(snap.data())
       }
       setLoading(false)
-    }
-    loadProfile()
-  }, [user.uid])
+    })
 
-  // Load completed sessions
-  useEffect(() => {
-    async function loadSessionCount() {
-      try {
-        const q = query(
-          collection(db, 'sessions'),
-          where('studentId', '==', user.uid),
-          where('status', '==', 'complete')
-        )
-        const snap = await getDocs(q)
-        setCompletedSessions(snap.size)
-      } catch (err) {
-        console.error('Failed to load session count:', err)
-      }
+    // 2. Real-time session listener (completed or submitted programs)
+    const sessQ = query(
+      collection(db, 'sessions'),
+      where('studentId', '==', user.uid)
+    )
+    const sessUnsub = onSnapshot(sessQ, (snap) => {
+      const doneCount = snap.docs.filter(d => {
+        const status = d.data().status
+        return status === 'complete' || status === 'submitted'
+      }).length
+      setCompletedSessions(doneCount)
+    })
+
+    return () => {
+      userUnsub()
+      sessUnsub()
     }
-    loadSessionCount()
-  }, [user.uid])
+  }, [user?.uid])
 
   // Animate counters
   useEffect(() => {
-    if (!profile) return
-
-    const targetStreak = profile.streak ?? 0
-    const targetBadges = profile.badges?.length ?? 0
+    const userStreakVal = profile?.streak ?? 0
+    const targetStreak = userStreakVal > 0 ? userStreakVal : (completedSessions > 0 ? 1 : 0)
+    const targetBadges = profile?.badges?.length ?? 0
     const targetSessions = completedSessions
-    const targetXp = (completedSessions * 100) + (targetBadges * 50) + (targetStreak * 10)
+    const targetXp = (completedSessions * 100) + (targetBadges * 50) + (targetStreak * 20)
 
     if (reducedMotion || !visibleElements.has('stats')) {
       setStreakCount(targetStreak)
@@ -95,8 +95,6 @@ export default function StudentDashboard({ user }) {
     const timer = setInterval(() => {
       currentStep++
       const progress = currentStep / steps
-
-      // easeOutQuart
       const easeProgress = 1 - Math.pow(1 - progress, 4)
 
       setStreakCount(Math.floor(targetStreak * easeProgress))

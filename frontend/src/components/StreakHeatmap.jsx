@@ -2,7 +2,7 @@
 // GitHub-style contribution heatmap showing session activity over last 12 weeks
 
 import { useEffect, useState } from 'react'
-import { collection, query, where, getDocs } from 'firebase/firestore'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { Loader2 } from 'lucide-react'
 
@@ -11,36 +11,47 @@ export default function StreakHeatmap({ userId, theme = 'dark' }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadActivity() {
-      try {
-        // Fetch all completed sessions for this student
-        const q = query(
-          collection(db, 'sessions'),
-          where('studentId', '==', userId),
-          where('status', '==', 'complete')
-        )
-        const snap = await getDocs(q)
-        
-        // Group by date (YYYY-MM-DD format)
-        const counts = {}
-        snap.docs.forEach(doc => {
-          const data = doc.data()
-          if (data.startedAt?.seconds) {
-            const date = new Date(data.startedAt.seconds * 1000)
-            const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD
-            counts[dateStr] = (counts[dateStr] || 0) + 1
+    if (!userId) return
+    setLoading(true)
+
+    // Real-time listener for student sessions
+    const q = query(
+      collection(db, 'sessions'),
+      where('studentId', '==', userId)
+    )
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const counts = {}
+      snap.docs.forEach(doc => {
+        const data = doc.data()
+        // Count any active, submitted, or complete session with code activity
+        if (data.status === 'complete' || data.status === 'submitted' || data.status === 'active' || data.status === 'quiz_pending') {
+          const rawDate = data.startedAt || data.submittedAt
+          if (rawDate) {
+            let dateObj
+            if (rawDate.seconds) {
+              dateObj = new Date(rawDate.seconds * 1000)
+            } else if (rawDate.toDate) {
+              dateObj = rawDate.toDate()
+            } else {
+              dateObj = new Date(rawDate)
+            }
+            if (!isNaN(dateObj.getTime())) {
+              const dateStr = dateObj.toISOString().split('T')[0] // YYYY-MM-DD
+              counts[dateStr] = (counts[dateStr] || 0) + 1
+            }
           }
-        })
-        
-        setActivityData(counts)
-      } catch (err) {
-        console.error('Failed to load activity:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadActivity()
+        }
+      })
+
+      setActivityData(counts)
+      setLoading(false)
+    }, (err) => {
+      console.warn('Heatmap real-time listener error:', err)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [userId])
 
   // Generate grid of last 12 weeks (84 days)

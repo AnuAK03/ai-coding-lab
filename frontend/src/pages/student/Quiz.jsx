@@ -1,7 +1,7 @@
 // frontend/src/pages/student/Quiz.jsx
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, getDoc } from 'firebase/firestore'
 import { db } from '../../services/firebase'
 import { generateQuiz, submitSession } from '../../services/api'
 import { CheckCircle, XCircle, Loader2, BookOpen } from 'lucide-react'
@@ -75,11 +75,58 @@ export default function Quiz() {
       await updateDoc(doc(db, 'sessions', sessionId), {
         quizScore:   quizScore,
         quizAnswers: quizAnswers,
-        status:      'submitted',   // ready for ML pipeline (Day 5)
+        status:      'submitted',   // ready for ML pipeline
       })
+
+      // Update student user streak & lastSessionDate directly in Firestore
+      if (studentId) {
+        try {
+          const userRef = doc(db, 'users', studentId)
+          const userSnap = await getDoc(userRef)
+          if (userSnap.exists()) {
+            const userData = userSnap.data()
+            const currentStreak = userData.streak || 0
+            const lastSessionDate = userData.lastSessionDate ? new Date(userData.lastSessionDate.seconds ? userData.lastSessionDate.seconds * 1000 : userData.lastSessionDate) : null
+            const now = new Date()
+            
+            let newStreak = currentStreak
+            if (!lastSessionDate || currentStreak === 0) {
+              newStreak = 1
+            } else {
+              const isSameDay = lastSessionDate.toDateString() === now.toDateString()
+              const diffTime = Math.abs(now - lastSessionDate)
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+              
+              if (!isSameDay) {
+                newStreak = diffDays <= 2 ? currentStreak + 1 : 1
+              } else if (currentStreak === 0) {
+                newStreak = 1
+              }
+            }
+
+            // Evaluate and award badges immediately
+            const currentBadges = new Set(userData.badges || [])
+            currentBadges.add('first_program')
+
+            if (quizScore >= 1.0) {
+              currentBadges.add('perfect_quiz')
+            }
+            if (newStreak >= 5) {
+              currentBadges.add('five_streak')
+            }
+
+            await updateDoc(userRef, {
+              streak: Math.max(1, newStreak),
+              lastSessionDate: new Date().toISOString(),
+              badges: Array.from(currentBadges),
+            })
+          }
+        } catch (sErr) {
+          console.warn('Failed to update streak in user doc:', sErr)
+        }
+      }
       
       // Trigger backend pipeline (streak/badges/completion)
-      // This runs as a background task, so we don't wait for it
       try {
         await submitSession({
           sessionId,
@@ -88,7 +135,6 @@ export default function Quiz() {
         })
         console.log('Pipeline triggered successfully')
       } catch (pipelineErr) {
-        // Don't block the UI — pipeline is best-effort/background
         console.error('Failed to trigger pipeline:', pipelineErr)
       }
     } catch (err) {

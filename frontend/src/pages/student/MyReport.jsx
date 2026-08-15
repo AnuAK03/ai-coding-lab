@@ -16,7 +16,7 @@ import CodeDiffViewer from '../../components/CodeDiffViewer'
 const TIER_INFO = {
   excellent:       { label: 'Excellent',       emoji: '🌟', bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/30'  },
   satisfactory:    { label: 'Satisfactory',    emoji: '👍', bg: 'bg-yellow-500/15', text: 'text-yellow-400', border: 'border-yellow-500/30' },
-  needs_attention: { label: 'Needs Attention', emoji: '📚', bg: 'bg-red-500/15',    text: 'text-red-400',    border: 'border-red-500/30'    },
+  needs_attention: { label: 'Poor',            emoji: '📚', bg: 'bg-red-500/15',    text: 'text-red-400',    border: 'border-red-500/30'    },
 }
 
 const IMPROVEMENT_MESSAGES = {
@@ -88,9 +88,25 @@ export default function MyReport() {
   )
 
   const report     = session.report || {}
-  const tier       = report.performanceTier
-  const tierInfo   = TIER_INFO[tier]
+  const quizScorePct = Math.round((session.quizScore || 0) * (session.quizScore <= 1.0 ? 100 : 1))
   const violations = session.violations || []
+  
+  // Dynamic performance tier calculation fallback
+  const calculatedTier = report.performanceTier || (
+    quizScorePct >= 80 && violations.length <= 1 ? 'excellent' : (quizScorePct >= 50 ? 'satisfactory' : 'needs_attention')
+  )
+  const tierInfo = TIER_INFO[calculatedTier] || TIER_INFO['satisfactory']
+
+  // Dynamic DICE counterfactual recommendations fallback
+  const diceChanges = (report.diceChanges && report.diceChanges.length > 0)
+    ? report.diceChanges
+    : [
+        { feature: 'quiz_score', from: `${quizScorePct}%`, to: '85%', direction: 'increase' },
+        { feature: 'hints_used', from: session.hintsUsed || 0, to: 0, direction: 'decrease' },
+        { feature: 'violation_count', from: violations.length, to: 0, direction: 'decrease' },
+      ].filter(c => String(c.from) !== String(c.to))
+
+  const isSubmittedOrComplete = session.status === 'complete' || session.status === 'submitted'
 
   return (
     <div className={`min-h-screen ${t.bg} ${t.text} py-10 px-4 transition-colors`}>
@@ -98,41 +114,65 @@ export default function MyReport() {
 
         {/* Back */}
         <button
-          onClick={() => navigate('/student/sessions')}
+          onClick={() => navigate('/student/progress')}
           className={`flex items-center gap-1 ${t.textMuted} hover:${t.text} text-sm mb-6 transition-colors`}
         >
-          <ChevronLeft size={16} /> Back to Sessions
+          <ChevronLeft size={16} /> Back to Session History
         </button>
 
         {/* Header */}
         <div className='flex items-start justify-between mb-6 flex-wrap gap-3'>
           <div>
-            <h1 className={`text-2xl font-bold ${t.text}`}>Session Report</h1>
+            <h1 className={`text-2xl font-bold ${t.text}`}>DICE Session Report</h1>
             <p className={`${t.textMuted} text-sm mt-0.5`}>
-              {program?.title || 'Unknown Program'}
+              {program?.title || session.programTitle || 'Program Evaluation'}
               {session.attemptNumber ? ` — Attempt #${session.attemptNumber}` : ''}
             </p>
           </div>
-          {tierInfo && (
-            <span className={`px-3 py-1.5 rounded-full text-sm font-semibold border
-                              ${tierInfo.bg} ${tierInfo.text} ${tierInfo.border}`}>
-              {tierInfo.emoji} {tierInfo.label}
+          <div className='flex items-center gap-2'>
+            <span className='px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20'>
+              Status: {session.status}
             </span>
-          )}
+            {tierInfo && (
+              <span className={`px-3 py-1.5 rounded-full text-sm font-semibold border
+                                ${tierInfo.bg} ${tierInfo.text} ${tierInfo.border}`}>
+                {tierInfo.emoji} {tierInfo.label}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Not ready */}
-        {session.status !== 'complete' && (
-          <div className={`${card} flex items-center gap-3 mb-5`} style={cardStyle}>
-            <Clock size={18} className='text-blue-400 flex-shrink-0' />
-            <p className={`${t.textMuted} text-sm`}>
-              Your report is being generated. Status: <strong>{session.status}</strong>.
-              Check back in a few minutes.
+        {/* Program Details Card */}
+        {program && (
+          <div className={`${card} mb-5`} style={cardStyle}>
+            <h3 className={`font-semibold ${t.text} text-base mb-2`}>Program Details</h3>
+            <p className={`text-xs ${t.textMuted} leading-relaxed mb-3`}>
+              {program.description || 'Practice problem.'}
             </p>
+            <div className='flex flex-wrap gap-2 text-xs'>
+              <span className='px-2.5 py-1 rounded bg-surface-container font-mono text-text-secondary border border-outline-variant/30'>
+                Subject: {program.subject || 'Python Basics'}
+              </span>
+              <span className='px-2.5 py-1 rounded bg-surface-container font-mono text-text-secondary border border-outline-variant/30'>
+                Difficulty: {program.difficulty || 'Easy'}
+              </span>
+              {program.concepts?.map(c => (
+                <span key={c} className='px-2.5 py-1 rounded bg-primary/10 text-primary font-medium border border-primary/20'>
+                  {c}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
-        {session.status === 'complete' && (
+        {!isSubmittedOrComplete ? (
+          <div className={`${card} flex items-center gap-3 mb-5`} style={cardStyle}>
+            <Clock size={18} className='text-blue-400 flex-shrink-0' />
+            <p className={`${t.textMuted} text-sm`}>
+              Your report is processing. Status: <strong>{session.status}</strong>.
+            </p>
+          </div>
+        ) : (
           <div className='space-y-5'>
 
             {/* ── Key stats ── */}

@@ -124,3 +124,35 @@ export async function generateFlowchart(programTitle, programDesc, concepts, sta
   }
   return res.json()   // { nodes: [...], variables: [...] }
 }
+
+// Fetch program submission statistics and DICE model evaluation reports
+export async function getProgramSubmissionsReport(programId) {
+  const res = await fetch(`/api/reports/program/${programId}/submissions`)
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try {
+      const err = await res.json()
+      detail = err.detail || detail
+    } catch (_) {}
+    throw new Error(detail)
+  }
+  return res.json()
+}
+
+// Trigger DICE report evaluation pipeline for a program on demand
+export async function generateProgramReport(programId) {
+  const res = await fetch(`/api/reports/program/${programId}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try {
+      const err = await res.json()
+      detail = err.detail || detail
+    } catch (_) {}
+    throw new Error(detail)
+  }
+  return res.json()
+}
+
